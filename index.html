@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skill Builder — certification study library</title>
+<meta name="description" content="Review mock exams, reports and Stories across certifications — installable and works offline.">
+<meta name="theme-color" content="#131109">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SkillBuilder">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%236e3a10'/><text y='.76em' x='50%25' text-anchor='middle' font-size='62' fill='%23fdc086'>R</text></svg>">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<header class="appbar">
+  <div class="appbar__mark">Skill Builder <span>review</span></div>
+  <div class="appbar__spacer"></div>
+  <button class="appbar__link appbar__link--icon" id="openStories" title="Story cards (s)">
+    <span aria-hidden="true">▶</span><span class="appbar__label">Stories</span>
+  </button>
+  <button class="appbar__link" id="openIndex">Reports <span class="appbar__n" id="indexCount">0</span></button>
+  <button class="appbar__link appbar__link--icon" id="offlineBtn" title="Save this attempt for offline stories">
+    <span aria-hidden="true">⤓</span><span class="appbar__label" id="offlineLabel">Offline</span>
+  </button>
+  <button class="appbar__link" id="installBtn" hidden title="Install as an app">Install</button>
+  <button class="iconbtn" id="themeBtn" title="Switch theme" aria-label="Switch theme">◑</button>
+</header>
+
+<div class="shell">
+  <aside class="rail" id="rail">
+    <div class="rail__head">
+      <div class="railh">Attempts</div>
+      <button class="iconbtn rail__close" id="railClose" aria-label="Close filters">✕</button>
+    </div>
+    <div class="attempts" id="attempts"></div>
+
+    <div class="railh">Filters</div>
+    <div class="field">
+      <span>Result</span>
+      <div class="chips" id="statusChips"></div>
+    </div>
+    <div class="field">
+      <span>Question type</span>
+      <select class="select" id="typeFilter"></select>
+    </div>
+    <div class="field">
+      <span>Declared confidence</span>
+      <select class="select" id="confFilter"></select>
+    </div>
+    <div class="field">
+      <span>Read time per analysis</span>
+      <select class="select" id="lenFilter">
+        <option value="all">any length</option>
+        <option value="s">under 2 min</option>
+        <option value="m">2 to 4 min</option>
+        <option value="l">over 4 min</option>
+      </select>
+    </div>
+  </aside>
+
+  <div class="scrim" id="scrim" hidden></div>
+
+  <main class="main">
+    <section class="study-scope" aria-label="Study content selection">
+      <label>Certification<select id="certSelector" class="select"></select></label>
+      <label>Mock exam<select id="examSelector" class="select"></select></label>
+      <label>Attempt<select id="attemptSelector" class="select"></select></label>
+      <div class="study-scope__materials" id="materialShelf"></div>
+    </section>
+    <div class="head" id="head"></div>
+    <div class="statgrid" id="stats"></div>
+    <details class="panel" id="breakdown"></details>
+
+    <div class="filterbar">
+      <button class="filterbar__toggle" id="railBtn" aria-expanded="false" aria-controls="rail">
+        <span class="filterbar__burger" aria-hidden="true"></span>Filters
+      </button>
+      <div class="filterbar__search">
+        <input class="input" id="search" type="search" placeholder="Search questions and reports" autocomplete="off">
+      </div>
+      <span class="filterbar__count" id="count"></span>
+      <button class="linkbtn" id="reset">clear</button>
+    </div>
+
+    <div class="insight" id="insight" hidden></div>
+    <div id="list"></div>
+  </main>
+</div>
+
+<!-- Analysis reader: the point of the whole app, so it gets its own surface -->
+<div class="reader" id="reader" hidden aria-modal="true" role="dialog" aria-label="Analysis">
+  <header class="reader__bar">
+    <button class="reader__icon" id="readerClose" aria-label="Close analysis">←</button>
+    <div class="reader__heading">
+      <span class="reader__qn" id="readerQn">Q1</span>
+      <span class="reader__topic" id="readerTopic"></span>
+    </div>
+    <button class="reader__icon reader__icon--text" id="readerTocBtn" aria-label="Table of contents">☰</button>
+    <button class="reader__icon" id="readerReadBtn" aria-label="Mark as read" title="Mark as read">○</button>
+  </header>
+
+  <nav class="reader__toc" id="readerToc" hidden aria-label="Table of contents"></nav>
+
+  <div class="reader__body" id="readerBody">
+    <details class="reader__q" id="readerQ">
+      <summary><span class="reader__qlabel">The question</span><span class="reader__qmeta" id="readerQMeta"></span></summary>
+      <div class="reader__qbody" id="readerQBody"></div>
+    </details>
+    <div class="md md--reader" id="readerContent"></div>
+  </div>
+
+  <footer class="reader__foot">
+    <div class="reader__track"><i id="readerProgress"></i></div>
+    <div class="reader__nav" id="readerNav">
+      <button class="btn" id="readerPrev">← Previous</button>
+      <span class="reader__pos" id="readerPos"></span>
+      <button class="btn btn--primary" id="readerNext">Next →</button>
+    </div>
+  </footer>
+</div>
+
+<!-- Library view over every analysis -->
+<div class="index" id="index" hidden aria-modal="true" role="dialog" aria-label="Reports">
+  <header class="index__bar">
+    <div>
+      <div class="index__title">Analyses</div>
+      <div class="index__sub" id="indexSub"></div>
+    </div>
+    <button class="reader__icon" id="indexClose" aria-label="Close">✕</button>
+  </header>
+  <div class="index__search">
+    <input class="input" id="indexSearch" type="search" placeholder="Filter reports" autocomplete="off">
+    <div class="index__tools">
+      <div class="chips" id="readChips"></div>
+      <span class="index__progress" id="readProgress"></span>
+    </div>
+  </div>
+  <div class="index__body" id="indexBody"></div>
+</div>
+
+<!-- Story deck: four screens per question, the last one rolls into the next -->
+<div class="deck" id="deck" hidden aria-modal="true" role="dialog" aria-label="Story cards">
+  <div class="deck__frame" id="deckFrame">
+    <div class="deck__bars" id="deckBars" aria-hidden="true"></div>
+    <header class="deck__head">
+      <div class="deck__id">
+        <span class="deck__q" id="deckQ">Q1</span>
+        <span class="deck__topic" id="deckTopic"></span>
+      </div>
+      <div class="deck__headact">
+        <button class="deck__icon" id="deckReadBtn" aria-label="Mark report as read" title="Mark the report as read">○</button>
+        <button class="deck__icon" id="deckClose" aria-label="Close stories">✕</button>
+      </div>
+    </header>
+    <div class="deck__scroll" id="deckScroll">
+      <div class="md deck__md" id="deckBody"></div>
+    </div>
+    <footer class="deck__foot">
+      <button class="deck__nav" id="deckPrev" aria-label="Previous screen">‹</button>
+      <div class="deck__pos"><span id="deckSlide">1/4</span> · <span id="deckCount"></span></div>
+      <button class="deck__nav" id="deckNext" aria-label="Next screen">›</button>
+    </footer>
+    <div class="deck__hint" id="deckHint" hidden></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script src="progress.js"></script>
+<script src="app.js"></script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js", { scope: "./" }).catch(() => {});
+  });
+}
+</script>
+</body>
+</html>

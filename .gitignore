@@ -1,0 +1,12 @@
+# Local study material is user-owned and must never enter the public source tree.
+/data/*
+!/data/index.json
+!/data/.gitkeep
+/.local/
+/.playwright-mcp/
+
+# Generated and local development files.
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.DS_Store
