@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "project": {
+    "name": "LearningZone",
+    "familyName": "learningzone",
+    "source": "https://example.invalid/project",
+    "path": "."
+  },
+  "services": [
+    {
+      "id": "web",
+      "name": "Skill Builder",
+      "portEnv": "WEB_PORT",
+      "interfaceUrl": "http://127.0.0.1:8000/",
+      "healthPath": "/"
+    }
+  ]
+}

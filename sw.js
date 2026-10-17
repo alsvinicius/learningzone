@@ -6,7 +6,7 @@
 
 importScripts("cache-utils.js");
 
-const VERSION = "sb-v2";
+const VERSION = "sb-v3";
 const STATIC_CACHE = `${VERSION}-static`;
 const CONTENT_CACHE = `${VERSION}-content`;
 const FONT_CACHE = `${VERSION}-fonts`;
@@ -20,6 +20,7 @@ const CORE = [
   "cache-utils.js",
   "manifest.webmanifest",
   "data/index.json",
+  "icons/icon.svg",
   "icons/icon-192.png",
   "icons/icon-512.png",
   "icons/maskable-512.png",
