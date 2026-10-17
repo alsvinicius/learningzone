@@ -12,6 +12,8 @@ Esse limite reduz a chance de exportações brutas, segredos ou materiais de ter
 
 O código usa MIT. Essa licença cobre software e documentação distribuídos com o arquivo LICENSE; ela não concede direitos sobre conteúdo adicionado por usuários, marcas, questões de exame, cursos, imagens ou documentos externos. Quem cria, copia ou distribui conteúdo deve ter autorização e respeitar termos aplicáveis.
 
+Os ícones distribuídos pelo projeto são desenhos geométricos originais; `icons/icon.svg` é sua fonte vetorial. Não há ativos de terceiros incorporados nesses ícones.
+
 Prefira escrever Stories e relatórios originais e mantenha referências à fonte e permissão em notas locais quando necessário. A aplicação não verifica direitos autorais nem assegura que um formato de exportação possa ser redistribuído.
 
 ## Conteúdo público opcional

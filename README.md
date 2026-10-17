@@ -11,15 +11,19 @@ A aplicação é estática, não exige conta, não envia dados a um servidor e p
 Requisitos: Python 3.10 ou superior, Node.js 18 ou superior para os testes de lógica JavaScript, e um navegador moderno. A aplicação não usa dependências de runtime nem processo de build.
 
 ```bash
-git clone <URL_DO_REPOSITORIO>
-cd <PASTA_DO_REPOSITORIO>
- make check
- make serve
+git clone https://github.com/alsvinicius/learningzone.git
+cd learningzone
+make check
+make serve
 ```
 
 Abra `http://localhost:8000/`. O servidor de desenvolvimento escuta apenas em `127.0.0.1`. Para usar outro endereço, informe `make serve PORT=8080`. Em hospedagem estática, publique os arquivos do projeto e sirva pela raiz; HTTPS é necessário para instalação PWA fora de `localhost`.
 
-O primeiro acesso mostra um estado vazio. Isso é esperado: o projeto não distribui conteúdo de certificação. Se você já mantém um catálogo privado em `.local/private-data/index.personal.json`, `make serve-private` o ativa localmente; essa cópia é ignorada pelo Git e `make check-public` volta a exigir o índice vazio. Siga o tutorial [Seu primeiro catálogo](docs/diataxis/tutorials/first-catalog.md) para criar um conjunto local.
+### Executar pela Project Gallery
+
+O LearningZone é uma aplicação estática, sem backend. Para executá-lo pelo catálogo local, use `make start` e `make stop`; a galeria atribui uma porta exclusiva ao servidor Web, que escuta somente em `127.0.0.1`. O manifesto [`project-gallery.json`](project-gallery.json) declara o serviço. Depois de iniciar a galeria, para registrar manualmente execute `node <CAMINHO_DA_PROJECT_GALLERY>/src/cli.ts register` na raiz deste projeto, substituindo o marcador pelo diretório onde a galeria está instalada.
+
+O primeiro acesso mostra um estado vazio. Isso é esperado: o projeto não distribui conteúdo de certificação. Se você mantém um catálogo privado em `.local/private-data/index.personal.json`, `make serve-private` o serve localmente na rota `data/index.json`, sem copiar ou alterar o índice público versionado. `make check-public` continua exigindo que o índice público permaneça vazio. Siga o tutorial [Seu primeiro catálogo](docs/diataxis/tutorials/first-catalog.md) para criar um conjunto local.
 
 ## O que a aplicação oferece
 

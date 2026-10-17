@@ -1,6 +1,20 @@
-.PHONY: check check-public test serve serve-private clean
+PROJECT_GALLERY_MK := $(wildcard .project-gallery.mk)
+-include .project-gallery.mk
 
-PORT ?= 8000
+.PHONY: check check-public test serve serve-private start stop clean
+
+ifeq ($(PROJECT_GALLERY_MK),.project-gallery.mk)
+ifneq ($(origin WEB_PORT),file)
+$(error .project-gallery.mk must define WEB_PORT for Project Gallery)
+endif
+PORT ?= $(WEB_PORT)
+else
+WEB_PORT ?= 8000
+PORT ?= $(WEB_PORT)
+endif
+GALLERY_PROCESS := scripts/gallery-process.sh
+GALLERY_PID := .gallery/web.pid
+GALLERY_LOG := .gallery/web.log
 
 check: test
 	python3 tools/check.py
@@ -13,10 +27,16 @@ test:
 	node --test tests/*.test.cjs
 serve: check
 	@echo "Skill Builder: http://localhost:$(PORT)/"
-	python3 -m http.server $(PORT) --bind 127.0.0.1
+	WEB_PORT=$(PORT) python3 scripts/serve.py
+
+start:
+	@bash $(GALLERY_PROCESS) start $(GALLERY_PID) $(GALLERY_LOG) $(WEB_PORT) env WEB_PORT=$(WEB_PORT) python3 scripts/serve.py
+
+stop:
+	@bash $(GALLERY_PROCESS) stop $(GALLERY_PID) $(GALLERY_LOG) $(WEB_PORT)
 
 serve-private:
-	python3 tools/use_private_catalog.py
-	$(MAKE) serve
+	@test -f .local/private-data/index.personal.json || { echo "No local catalog backup found at .local/private-data/index.personal.json." >&2; exit 1; }
+	PRIVATE_INDEX_PATH=.local/private-data/index.personal.json WEB_PORT=$(PORT) $(MAKE) serve
 clean:
 	find . -type d -name __pycache__ -prune -exec rm -rf {} +

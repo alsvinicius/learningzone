@@ -6,6 +6,8 @@ A aplicação separa conteúdo de estudo do estado de leitura. Conteúdo fica em
 
 Não é necessário operar conta, banco de dados ou sincronização. Os arquivos podem ser inspecionados e copiados como arquivos comuns. Cada navegador mantém seu progresso, e a pessoa escolhe quais materiais deseja guardar offline.
 
+O modo `make serve-private` seleciona um índice salvo em `.local/private-data/` e o entrega pela rota local do catálogo. O servidor não copia esse índice para `data/index.json`, que permanece como ponto de entrada versionado e vazio na distribuição pública.
+
 ## Limites
 
 O progresso não acompanha a pessoa entre dispositivos e pode ser removido ao limpar dados do site. Cache não equivale a backup: o navegador pode remover arquivos. Não há recuperação remota. Ao mover para outro dispositivo, conteúdo pode ser copiado por meio privado e salvo offline novamente; progresso não será transferido automaticamente.

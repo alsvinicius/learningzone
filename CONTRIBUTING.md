@@ -25,6 +25,8 @@ make check
 make serve
 ```
 
+Para iniciar ou parar a interface por meio da Project Gallery, use `make start` e `make stop`. O serviço declarado no manifesto é somente a aplicação Web estática; o alvo `start` recebe a porta alocada pela galeria em `WEB_PORT`.
+
 ## Fluxo de contribuição
 
 1. Crie uma branch curta a partir da versão atual.
