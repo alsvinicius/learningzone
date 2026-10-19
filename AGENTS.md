@@ -46,7 +46,7 @@ Execute na raiz:
 make check
 ```
 
-Para a execução local gerenciada pela Project Gallery, use `make start` e `make stop`. O manifesto `project-gallery.json` declara a interface Web e o alvo usa a porta que a galeria fornece em `WEB_PORT`.
+Para a execução local gerenciada pela Project Gallery, use `make start` e `make stop`. O manifesto `project-gallery.json` declara a interface Web e o alvo usa a porta que a galeria fornece em `WEB_PORT`, inclusive pela atribuição `override export` gerada. `make start` seleciona o catálogo privado padrão quando ele existe, sem alterar o índice público; consulte a [referência de comandos](docs/diataxis/reference/development-commands.md) para selecionar outro catálogo ou reiniciar.
 
 Isso roda os testes Python, testes Node e o verificador do catálogo/PWA. Para revisar visualmente, rode `make serve` e abra `http://localhost:8000/`. Não deixe processos que você iniciou rodando após a revisão.
 
