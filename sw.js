@@ -14,8 +14,8 @@ const FONT_CACHE = `${VERSION}-fonts`;
 const CORE = [
   "./",
   "index.html",
-  "app.css",
-  "app.js",
+  "app.css?v=11",
+  "app.js?v=11",
   "progress.js",
   "cache-utils.js",
   "manifest.webmanifest",

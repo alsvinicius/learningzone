@@ -12,4 +12,6 @@ O service worker fornece o shell estático e mantém arquivos solicitados para u
 
 ## Desenvolvimento
 
-A lista do shell é declarada no service worker. Ao renomear ou adicionar arquivos base, atualize a lista e incremente o identificador do cache. Materiais são buscados pelos caminhos dos manifests, sujeitos às verificações de origem e contenção do catálogo.
+A lista do shell é declarada no service worker. Os recursos da interface usam URLs versionadas, como `app.css?v=11` e `app.js?v=11`, tanto no HTML quanto na lista do shell. Ao atualizar essas versões, mantenha os dois locais iguais para carregar o código novo e preservá-lo offline. Essa atualização não exige apagar o cache de materiais ou o progresso em `localStorage`.
+
+Ao mudar de forma incompatível a organização dos caches, incremente seu identificador; a ativação poderá remover caches de versões anteriores. Materiais são buscados pelos caminhos dos manifests, sujeitos às verificações de origem e contenção do catálogo.

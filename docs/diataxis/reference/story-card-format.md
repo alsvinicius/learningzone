@@ -25,6 +25,10 @@ O idioma do corpo é escolha da pessoa autora. Os títulos de seção são token
 
 O material declara `id`, `type: "story"`, `title`, `path` e opcionalmente `questionNumber`. Se associado a uma questão, o cartão deve ser referenciado pelo mesmo ID com o `scope` correto. O número em H1 deve corresponder a `questionNumber`, quando presente.
 
+## Links
+
+O último ecrã pode apontar para o relatório completo e para o guia conceitual usando a rota da aplicação: `<index.html>#<certificação>/<simulado>/<tentativa>/<id-do-material>`. A rota abre a página de leitura em nova aba; dentro dela, links entre relatórios permanecem na mesma página. Caminhos `.md` continuam válidos para abrir o arquivo diretamente.
+
 ## Validação
 
 `tools/content.py` verifica as quatro seções, ordem, corpo não vazio, H1, número e metadados Domain/Task/Signal. O validador não julga correção pedagógica ou factual.
