@@ -4,8 +4,11 @@ PROJECT_GALLERY_MK := $(wildcard .project-gallery.mk)
 .PHONY: check check-public test serve serve-private start stop clean
 
 ifeq ($(PROJECT_GALLERY_MK),.project-gallery.mk)
-ifneq ($(origin WEB_PORT),file)
+ifeq ($(filter file override,$(origin WEB_PORT)),)
 $(error .project-gallery.mk must define WEB_PORT for Project Gallery)
+endif
+ifeq ($(strip $(WEB_PORT)),)
+$(error .project-gallery.mk must define a nonempty WEB_PORT for Project Gallery)
 endif
 PORT ?= $(WEB_PORT)
 else
@@ -15,6 +18,7 @@ endif
 GALLERY_PROCESS := scripts/gallery-process.sh
 GALLERY_PID := .gallery/web.pid
 GALLERY_LOG := .gallery/web.log
+PRIVATE_INDEX_PATH ?= $(wildcard .local/private-data/index.personal.json)
 
 check: test
 	python3 tools/check.py
@@ -30,7 +34,7 @@ serve: check
 	WEB_PORT=$(PORT) python3 scripts/serve.py
 
 start:
-	@bash $(GALLERY_PROCESS) start $(GALLERY_PID) $(GALLERY_LOG) $(WEB_PORT) env WEB_PORT=$(WEB_PORT) python3 scripts/serve.py
+	@bash $(GALLERY_PROCESS) start $(GALLERY_PID) $(GALLERY_LOG) $(WEB_PORT) env WEB_PORT=$(WEB_PORT) PRIVATE_INDEX_PATH="$(PRIVATE_INDEX_PATH)" python3 scripts/serve.py
 
 stop:
 	@bash $(GALLERY_PROCESS) stop $(GALLERY_PID) $(GALLERY_LOG) $(WEB_PORT)

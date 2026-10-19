@@ -25,7 +25,7 @@ make check
 make serve
 ```
 
-Para iniciar ou parar a interface por meio da Project Gallery, use `make start` e `make stop`. O serviço declarado no manifesto é somente a aplicação Web estática; o alvo `start` recebe a porta alocada pela galeria em `WEB_PORT`.
+Para iniciar ou parar a interface por meio da Project Gallery, use `make start` e `make stop`. O serviço declarado no manifesto é somente a aplicação Web estática; o alvo `start` recebe a porta alocada pela galeria em `WEB_PORT`. Preserve a atribuição `override export` do arquivo gerado. Quando existe um catálogo privado local, a inicialização gerenciada o seleciona sem alterar o índice público; a [referência de comandos](docs/diataxis/reference/development-commands.md) descreve a seleção explícita e a reinicialização.
 
 ## Fluxo de contribuição
 
