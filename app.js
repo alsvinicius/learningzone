@@ -8,6 +8,7 @@ const state = {
   selectedCertificationId: null,
   selectedExamId: null,
   attempt: null,
+  attemptDates: new Map(),
   filters: { status: "incorrect", type: "all", confidence: "all", len: "all", q: "" },
   openNotes: new Set(),
   noteCache: new Map(),
@@ -20,6 +21,7 @@ const state = {
   cardIndex: new Map(),
   reader: { open: false, n: null, list: [], scrolled: false, material: null },
   deck: { open: false, n: null, slide: 0, list: [] },
+  report: { open: false, material: null, n: null, token: 0, headings: [] },
   read: new Set(),
   readFilter: "unread",
 };
@@ -122,6 +124,9 @@ function syncReadUi(n) {
   }
   if (n != null && state.deck.open && state.deck.n === n) {
     paintReadToggle(el("deckReadBtn"), isRead(n));
+  }
+  if (n != null && state.report.open && state.report.n === n) {
+    paintReadToggle(el("reportReadBtn"), isRead(n));
   }
   renderReadFilter();
   // A row that no longer matches the read filter has to leave the list, and
@@ -362,6 +367,49 @@ function attemptEntry(id = state.attempt?.attemptId) {
   return currentExamEntry()?.attempts.find((x) => x.id === id);
 }
 
+function formatAttemptDate(attempt) {
+  const values = [attempt?.window?.startTime, attempt?.date, attempt?.attemptId];
+  for (const value of values) {
+    if (value == null || value === "") continue;
+    let date;
+    if (typeof value === "number") {
+      date = new Date(Math.abs(value) < 1e11 ? value * 1000 : value);
+    } else if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const [year, month, day] = value.split("-").map(Number);
+      date = new Date(year, month - 1, day);
+      if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) continue;
+    } else if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
+      date = new Date(value);
+    } else {
+      continue;
+    }
+    if (!Number.isNaN(date.getTime())) {
+      return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+    }
+  }
+  return null;
+}
+
+async function loadAttemptDates(examEntry) {
+  await Promise.all(examEntry.attempts.map(async (entry) => {
+    if (state.attemptDates.has(entry.path)) return;
+    try {
+      const response = await fetch(`${DATA}${entry.path}`);
+      if (!response.ok) return;
+      state.attemptDates.set(entry.path, formatAttemptDate(await response.json()));
+    } catch { /* Keep the original label when a date is unavailable offline. */ }
+  }));
+}
+
+function attemptLabel(entry) {
+  const date = state.attemptDates.get(entry.path) || formatAttemptDate({ attemptId: entry.id });
+  if (!date) return entry.id;
+  const sameDate = (currentExamEntry()?.attempts || []).filter((item) =>
+    (state.attemptDates.get(item.path) || formatAttemptDate({ attemptId: item.id })) === date
+  );
+  return sameDate.length > 1 ? `${date} · ${sameDate.findIndex((item) => item.id === entry.id) + 1}` : date;
+}
+
 function humanizeId(value) {
   return String(value || "").replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -407,7 +455,7 @@ function renderCatalogControls() {
     .map((x) => `<option value="${esc(x.id)}">${esc(humanizeId(x.id))}</option>`).join("");
   el("examSelector").value = state.selectedExamId || "";
   el("attemptSelector").innerHTML = attempts.length
-    ? attempts.map((x) => `<option value="${esc(x.id)}">${esc(x.id)}</option>`).join("")
+    ? attempts.map((x) => `<option value="${esc(x.id)}">${esc(attemptLabel(x))}</option>`).join("")
     : `<option value="">No attempts yet</option>`;
   el("attemptSelector").value = attempts.find((x) => x.id === state.attempt?.attemptId)?.id || attempts[0]?.id || "";
   el("examSelector").disabled = !(cert?.exams.length);
@@ -441,7 +489,7 @@ function renderRail() {
       const on = a.id === state.attempt?.attemptId;
       return `<button class="attempt" data-attempt="${esc(a.id)}" aria-current="${on}">
         <div class="attempt__top">
-          <span class="attempt__date">${esc(a.id)}</span>
+          <span class="attempt__date">${esc(attemptLabel(a))}</span>
         </div>
         <div class="attempt__meta">${esc(state.exam?.title || humanizeId(state.selectedExamId))}</div>
       </button>`;
@@ -1054,7 +1102,8 @@ const reportList = () => state.attempt.questions.filter((q) => q.note);
 
 function openIndex() {
   const all = reportList();
-  el("indexSub").textContent = `${all.length} written for the questions you missed on ${state.attempt.date}`;
+  const date = formatAttemptDate(state.attempt);
+  el("indexSub").textContent = `${all.length} reports for this attempt${date ? ` · ${date}` : ""}`;
   el("index").hidden = false;
   document.body.style.overflow = "hidden";
   renderReadFilter();
@@ -1156,6 +1205,302 @@ async function prefetchNotes() {
     }),
   ]);
   el("indexCount").textContent = notes.length;
+}
+
+/* ---------- Full-page report ---------- */
+
+/* A link from the last Story screen opens this route in a new tab:
+   #<cert>/<exam>/<attempt>/<report-material-id>. It is a real page, not the
+   in-app reader overlay: one report, its own title and table of contents, and
+   a print view. The Markdown is the same file the reader uses. */
+const APP_TITLE = "Skill Builder — certification study library";
+
+function selectionHash() {
+  const a = state.attempt;
+  if (!a) return `#${state.selectedCertificationId || ""}/${state.selectedExamId || ""}`;
+  return `#${a.certificationId}/${a.examId}/${a.attemptId}`;
+}
+
+function reportHash(material) {
+  return `${selectionHash()}/${material.id}`;
+}
+
+function materialForId(id) {
+  if (!id) return null;
+  for (const scope of ["attempt", "exam"]) {
+    const list = scope === "attempt" ? state.attempt?.materials : state.exam?.materials;
+    const material = list?.find((m) => m.id === id);
+    if (material) return { ...material, scope, url: materialUrl(material, scope) };
+  }
+  return null;
+}
+
+function reportForId(id) {
+  const material = materialForId(id);
+  return material?.type === "report" ? material : null;
+}
+
+function reportKicker(material) {
+  if (material.questionNumber) return `Q${material.questionNumber} · Full review`;
+  if (material.id.startsWith("topic-")) return "Concept guide";
+  return String(material.title || "Report").split("·")[0].trim() || "Report";
+}
+
+/* The report is a page on top of the library. Make the library behind it
+   unreachable from the keyboard and from assistive technology. */
+const REPORT_SHELL = [".appbar", ".shell", ".reader", ".index", ".deck"];
+function setReportShellInert(on) {
+  for (const selector of REPORT_SHELL) {
+    const node = document.querySelector(selector);
+    if (node) node.toggleAttribute("inert", on);
+  }
+}
+
+/* Pull the H1 and the metadata list out of the Markdown so the page can show
+   them as a hero. Everything after that is rendered by the common renderer. */
+function splitReport(text) {
+  const lines = String(text).replace(/\r\n?/g, "\n").split("\n");
+  let i = 0;
+  while (i < lines.length && !lines[i].trim()) i++;
+  let title = "";
+  if (/^#\s+/.test(lines[i] || "")) {
+    title = plainText(lines[i].replace(/^#\s+/, "").replace(/\s*#+\s*$/, "").trim());
+    i++;
+  }
+  while (i < lines.length && !lines[i].trim()) i++;
+  const meta = [];
+  if (/^\s*-\s+\*\*[^*]+:\*\*/.test(lines[i] || "")) {
+    while (i < lines.length) {
+      const m = /^\s*-\s+\*\*(.+?):\*\*\s*(.*)$/.exec(lines[i]);
+      if (!m) break;
+      meta.push({ label: m[1].trim(), value: m[2].trim() });
+      i++;
+    }
+  }
+  return { title, meta, body: lines.slice(i).join("\n").trim() };
+}
+
+function buildReportToc() {
+  const heads = [...el("reportContent").querySelectorAll("h2, h3")];
+  state.report.headings = heads;
+  const toc = el("reportToc");
+  el("reportView").classList.toggle("is-single", !heads.length);
+  if (!heads.length) {
+    toc.innerHTML = "";
+    return;
+  }
+  heads.forEach((h, i) => {
+    if (!h.id) h.id = `report-sec-${i}`;
+  });
+  toc.innerHTML = heads
+    .map(
+      (h) =>
+        `<a href="#" data-sec="${esc(h.id)}" class="${h.tagName === "H3" ? "is-sub" : ""}">${esc(
+          h.textContent
+        )}</a>`
+    )
+    .join("");
+}
+
+/* Internal report links stay inside this reading page; external links keep
+   their new-tab behavior. Story card links are left as the raw Markdown. */
+function rewriteReportLinks(root) {
+  const byUrl = new Map();
+  const add = (material, scope) => {
+    if (material.type !== "report") return;
+    byUrl.set(new URL(materialUrl(material, scope), location.href).href, material);
+  };
+  for (const m of state.attempt?.materials || []) add(m, "attempt");
+  for (const m of state.exam?.materials || []) add(m, "exam");
+
+  for (const a of root.querySelectorAll("a[href]")) {
+    const raw = a.getAttribute("href");
+    if (!raw || raw.startsWith("#")) continue;
+    let abs;
+    try {
+      abs = new URL(raw, location.href);
+    } catch {
+      continue;
+    }
+    if (abs.origin !== location.origin) continue;
+    const material = byUrl.get(abs.href);
+    if (!material) continue;
+    a.setAttribute("href", reportHash(material));
+    a.removeAttribute("target");
+    a.removeAttribute("rel");
+  }
+}
+
+/* A bold lead makes a paragraph a callout. Reports use "Technical caveat" and
+   "Teaching note" for the two cases worth pulling out of the prose. */
+function decorateReport(root) {
+  for (const p of root.querySelectorAll("p")) {
+    const strong = p.firstElementChild;
+    if (!strong || strong.tagName !== "STRONG") continue;
+    const text = strong.textContent.trim();
+    if (/^Technical caveat/.test(text)) p.classList.add("md-callout", "md-callout--warn");
+    else if (/^Teaching note/.test(text)) p.classList.add("md-callout", "md-callout--note");
+  }
+}
+
+function onReportScroll() {
+  if (!state.report.open) return;
+  const sc = el("reportScroll");
+  const max = sc.scrollHeight - sc.clientHeight;
+  const pct = max > 4 ? Math.min(100, Math.max(0, (sc.scrollTop / max) * 100)) : 100;
+  el("reportProgress").style.width = `${pct}%`;
+
+  const heads = state.report.headings;
+  let active = heads[0]?.id || null;
+  const line = sc.getBoundingClientRect().top + 96;
+  for (const h of heads) {
+    if (h.getBoundingClientRect().top <= line) active = h.id;
+  }
+  if (pct >= 99 && heads.length) active = heads[heads.length - 1].id;
+  for (const a of el("reportToc").querySelectorAll("a[data-sec]")) {
+    const current = a.dataset.sec === active;
+    a.classList.toggle("is-active", current);
+    if (current) a.setAttribute("aria-current", "true");
+    else a.removeAttribute("aria-current");
+  }
+
+  if (state.report.n && pct >= 99) {
+    if (max > 4 && sc.scrollTop <= 0) return;
+    markRead(state.report.n, true, true);
+  }
+}
+
+async function openReportPage(material) {
+  if (!material) return;
+  const token = ++state.report.token;
+  state.report.open = true;
+  state.report.material = material;
+  state.report.n = material.questionNumber || null;
+
+  document.body.classList.add("is-report");
+  document.body.style.overflow = "hidden";
+  setReportShellInert(true);
+  el("reportView").hidden = false;
+  el("reportScroll").scrollTop = 0;
+  el("reportContent").setAttribute("aria-busy", "true");
+  el("reportContent").innerHTML = `<p class="panel__hint">Loading report…</p>`;
+  el("reportKicker").textContent = reportKicker(material);
+  el("reportCrumb").textContent = material.questionNumber ? "Full review" : reportKicker(material);
+  el("reportTitle").textContent = material.title || "Report";
+  el("reportMeta").hidden = true;
+  el("reportMeta").innerHTML = "";
+  el("reportToc").innerHTML = "";
+  el("reportView").classList.remove("is-single");
+  el("reportProgress").style.width = "0%";
+
+  const back = selectionHash();
+  for (const id of ["reportHome", "reportClose", "reportBack", "reportBackFoot"]) {
+    el(id).setAttribute("href", back);
+  }
+
+  const readBtn = el("reportReadBtn");
+  if (state.report.n) {
+    readBtn.hidden = false;
+    readBtn.dataset.readToggle = String(state.report.n);
+    paintReadToggle(readBtn, isRead(state.report.n));
+  } else {
+    readBtn.hidden = true;
+    delete readBtn.dataset.readToggle;
+  }
+  document.title = `${plainText(material.title || "Report")} — Skill Builder`;
+
+  try {
+    const res = await fetch(material.url);
+    if (!res.ok) throw new Error(`${material.url} returned ${res.status}`);
+    const text = await res.text();
+    if (token !== state.report.token) return;
+
+    const parsed = splitReport(text);
+    const title = parsed.title.replace(/^Q\d+\s*[—–-]\s*/, "") || material.title || "Report";
+    el("reportTitle").textContent = title;
+    document.title = `${title} — Skill Builder`;
+
+    if (parsed.meta.length) {
+      el("reportMeta").innerHTML = parsed.meta
+        .map(({ label, value }, i) => {
+          const tone = /source result/i.test(label)
+            ? /^correct/i.test(value)
+              ? " is-good"
+              : /^incorrect/i.test(value)
+                ? " is-bad"
+                : ""
+            : "";
+          const wide =
+            parsed.meta.length % 2 === 1 && i === parsed.meta.length - 1
+              ? " reportview__fact--wide"
+              : "";
+          return `<div class="reportview__fact${tone}${wide}"><dt>${esc(label)}</dt><dd>${esc(
+            value
+          )}</dd></div>`;
+        })
+        .join("");
+      el("reportMeta").hidden = false;
+    }
+
+    const base = material.url.slice(0, material.url.lastIndexOf("/") + 1);
+    const content = el("reportContent");
+    content.innerHTML = renderMarkdown(parsed.body, base);
+    stripFrontMatter(content);
+    wrapTables(content);
+    rewriteReportLinks(content);
+    decorateReport(content);
+    buildReportToc();
+    content.setAttribute("aria-busy", "false");
+    el("reportScroll").scrollTop = 0;
+    el("reportTitle").focus({ preventScroll: true });
+    requestAnimationFrame(onReportScroll);
+  } catch (err) {
+    if (token !== state.report.token) return;
+    el("reportContent").setAttribute("aria-busy", "false");
+    el("reportContent").innerHTML = `<p class="panel__hint">Could not read this report: ${esc(
+      err.message
+    )}</p>`;
+  }
+}
+
+function closeReportPage() {
+  if (!state.report.open) return;
+  state.report.open = false;
+  state.report.token++;
+  state.report.material = null;
+  state.report.n = null;
+  state.report.headings = [];
+  el("reportView").hidden = true;
+  el("reportContent").innerHTML = "";
+  el("reportMeta").innerHTML = "";
+  el("reportToc").innerHTML = "";
+  el("reportProgress").style.width = "0%";
+  delete el("reportReadBtn").dataset.readToggle;
+  document.body.classList.remove("is-report");
+  document.body.style.overflow = "";
+  setReportShellInert(false);
+  document.title = APP_TITLE;
+}
+
+function handleReportRoute() {
+  if (!state.attempt) return;
+  const parts = location.hash.slice(1).split("/");
+  const id = parts[3] || null;
+  if (!id) {
+    if (state.report.open) closeReportPage();
+    return;
+  }
+  if (parts[2] !== state.attempt.attemptId) {
+    if (state.report.open) closeReportPage();
+    return;
+  }
+  const material = reportForId(id);
+  if (material) {
+    if (state.report.open && state.report.material?.id === id) return;
+    openReportPage(material);
+  } else if (state.report.open) {
+    closeReportPage();
+  }
 }
 
 /* ---------- PWA: install prompt + offline stories ---------- */
@@ -1512,6 +1857,8 @@ async function loadAttempt(id, { push = true } = {}) {
   const res = await fetch(`${DATA}${entry.path}`);
   if (!res.ok) throw new Error(`${DATA}${entry.path} not found (${res.status})`);
   state.attempt = await res.json();
+  state.attemptDates.set(entry.path, formatAttemptDate(state.attempt));
+  await loadAttemptDates(examEntry);
   attachMaterials(state.attempt);
   state.openNotes.clear();
   state.noteIndex.clear();
@@ -1537,6 +1884,21 @@ function setRail(open) {
   el("rail").classList.toggle("is-open", open);
   el("scrim").hidden = !open;
   el("railBtn").setAttribute("aria-expanded", String(open));
+}
+
+function paintTheme() {
+  const light = document.documentElement.dataset.theme === "light";
+  for (const id of ["themeBtn", "reportTheme"]) {
+    const button = el(id);
+    if (button) button.textContent = light ? "◐" : "◑";
+  }
+}
+
+function toggleTheme() {
+  const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  document.documentElement.dataset.theme = next;
+  localStorage.setItem("sb-theme", next);
+  paintTheme();
 }
 
 function wire() {
@@ -1681,23 +2043,38 @@ function wire() {
   wireDeckGestures();
   wirePwa();
 
-  el("themeBtn").addEventListener("click", () => {
-    const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
-    document.documentElement.dataset.theme = next;
-    localStorage.setItem("sb-theme", next);
-    el("themeBtn").textContent = next === "light" ? "◐" : "◑";
+  // full-page report
+  el("reportPrint").addEventListener("click", () => window.print());
+  el("reportReadBtn").addEventListener("click", () => {
+    if (state.report.n) markRead(state.report.n, !isRead(state.report.n));
   });
+  el("reportScroll").addEventListener("scroll", onReportScroll, { passive: true });
+  el("reportToc").addEventListener("click", (e) => {
+    const link = e.target.closest("a[data-sec]");
+    if (!link) return;
+    e.preventDefault();
+    document.getElementById(link.dataset.sec)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  window.addEventListener("hashchange", handleReportRoute);
+
+  el("themeBtn").addEventListener("click", toggleTheme);
+  el("reportTheme").addEventListener("click", toggleTheme);
 
   const saved = localStorage.getItem("sb-theme");
-  if (saved) {
-    document.documentElement.dataset.theme = saved;
-    el("themeBtn").textContent = saved === "light" ? "◐" : "◑";
-  }
+  if (saved) document.documentElement.dataset.theme = saved;
+  paintTheme();
 
   document.addEventListener("keydown", (e) => {
     const typingNow = /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
 
     if (e.key === "Escape") {
+      if (state.report.open) {
+        e.preventDefault();
+        const target = selectionHash();
+        closeReportPage();
+        if (location.hash !== target) location.hash = target;
+        return;
+      }
       if (state.deck.open) return closeDeck();
       if (state.reader.open) return closeReader();
       if (!el("index").hidden) return closeIndex();
@@ -1714,6 +2091,7 @@ function wire() {
     }
 
     if (typingNow) return;
+    if (state.report.open) return;
 
     if (state.deck.open) {
       if (["ArrowRight", "j", " "].includes(e.key)) {
@@ -1807,6 +2185,7 @@ async function boot() {
   state.selectedExamId = selection.exam.id;
   renderCatalogControls();
   await loadAttempt(selection.attempt?.id || null, { push: false });
+  handleReportRoute();
 }
 
 boot();

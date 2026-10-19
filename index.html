@@ -13,7 +13,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
-<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="app.css?v=11">
 </head>
 <body>
 
@@ -169,10 +169,48 @@
   </div>
 </div>
 
+<!-- Full-page report: opened from the last screen of a Story in a new tab. -->
+<section class="reportview" id="reportView" hidden aria-labelledby="reportTitle">
+  <header class="reportview__bar">
+    <a class="reportview__brand" id="reportHome" href="#">
+      <span>Skill Builder</span>
+      <span class="reportview__crumb" id="reportCrumb">Full review</span>
+    </a>
+    <div class="reportview__actions">
+      <button class="reportview__icon" id="reportReadBtn" type="button" aria-label="Mark as read" title="Mark as read">○</button>
+      <button class="reportview__icon" id="reportPrint" type="button" aria-label="Print report" title="Print report">⎙</button>
+      <button class="reportview__icon" id="reportTheme" type="button" aria-label="Switch theme" title="Switch theme">◑</button>
+      <a class="reportview__icon" id="reportClose" href="#" aria-label="Close report" title="Close report">✕</a>
+    </div>
+  </header>
+  <div class="reportview__scroll" id="reportScroll">
+    <div class="reportview__wrap">
+      <header class="reportview__hero">
+        <div class="reportview__kicker" id="reportKicker">Full review</div>
+        <h1 class="reportview__title" id="reportTitle" tabindex="-1"></h1>
+        <dl class="reportview__meta" id="reportMeta" hidden></dl>
+      </header>
+      <div class="reportview__grid" id="reportGrid">
+        <aside class="reportview__aside" id="reportAside">
+          <div class="reportview__asideTitle">In this review</div>
+          <nav class="reportview__toc" id="reportToc" aria-label="Report contents"></nav>
+          <a class="reportview__back" id="reportBack" href="#">← Back to the attempt</a>
+        </aside>
+        <article class="md md--review" id="reportContent" aria-busy="false"></article>
+      </div>
+      <footer class="reportview__foot">
+        <span>Private study library · reports are editorial material.</span>
+        <a id="reportBackFoot" href="#">Back to the attempt</a>
+      </footer>
+    </div>
+  </div>
+  <div class="reportview__progress" aria-hidden="true"><i id="reportProgress"></i></div>
+</section>
+
 <div class="toast" id="toast" role="status"></div>
 
 <script src="progress.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=11"></script>
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
