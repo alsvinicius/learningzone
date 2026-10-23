@@ -51,8 +51,16 @@ No índice, acrescente ao simulado o registro `{"id":"run-1","path":"demo-cert/p
 Crie `cards/q01.md` com título `# Q1 — Conceito de demonstração`, metadados `Domain`, `Task` e `Signal` e as quatro seções obrigatórias:
 
 ```markdown
+- **Domain**: 1 — Foundation Model Integration
+- **Task**: 1.1 — Analyze requirements and design GenAI solutions
+- **Signal**: "conceito inventado deste tutorial"
+
 ## Topic
-Conceito inventado deste tutorial.
+
+Conceito inventado deste tutorial, com o contexto da questão.
+
+**Your answer (incorrect):** a opção escolhida na questão sintética.
+**Correct answer:** a opção gabaritada na questão sintética.
 
 ## Why you got it wrong
 Uma confusão plausível na questão sintética.
@@ -61,7 +69,8 @@ Uma confusão plausível na questão sintética.
 A distinção que resolve o exemplo.
 
 ## Concepts to nail it next time
-Uma regra de lembrança escrita por você.
+- Uma regra de lembrança escrita por você.
+- The sentence to keep: **a regra, em uma frase.**
 ```
 
 No manifesto, acrescente a `materials` um item com ID `story-q01`, tipo `story`, título, caminho `cards/q01.md` e `questionNumber: 1`. Na questão 1, acrescente `materials: [{"scope":"attempt","id":"story-q01"}]`. Substitua também `materials: []` no nível da tentativa por esse item. A questão pulada não altera contagens nem percentuais.

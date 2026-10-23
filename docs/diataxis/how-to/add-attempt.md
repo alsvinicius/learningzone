@@ -23,3 +23,5 @@ Relatórios Markdown ficam em `reports/`; cartões em `cards/`. Registre-os em `
 ## 4. Verifique
 
 Execute `make check` e `make serve`. Compare contagens, respostas, score e agregados com a fonte. Abra materiais no app e confirme que a tentativa aparece uma única vez. Apague exportações brutas quando não forem necessárias. Conteúdo de estudo permanece local; consulte [política de conteúdo](../explanation/content-and-licensing.md).
+
+Após registrar a tentativa e os materiais, [atualize o Pre-Test Review](update-pre-test-review.md) de toda a certificação. Preserve as notas do aluno, confira a cobertura e valide o catálogo privado explicitamente antes de finalizar.

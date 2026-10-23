@@ -24,6 +24,10 @@ const state = {
   report: { open: false, material: null, n: null, token: 0, headings: [] },
   read: new Set(),
   readFilter: "unread",
+  certificationStatus: {},
+  galleryOpen: false,
+  certificationMaterialCounts: new Map(),
+  galleryRenderToken: 0,
 };
 
 /* Read state lives in localStorage: the app has no backend, and "which reports
@@ -295,6 +299,7 @@ function renderMarkdown(src, base = "") {
       buf.push(lines[i++]);
     }
     if (buf.length) html.push(`<p>${renderInline(buf.join(" "), base)}</p>`);
+    else html.push(`<p>${renderInline(lines[i++], base)}</p>`);
   }
 
   return html.join("\n");
@@ -357,6 +362,157 @@ function visibleQuestions() {
 
 function currentCertification() {
   return state.manifest?.certifications.find((x) => x.id === state.selectedCertificationId);
+}
+
+function certificationArchive(certId) {
+  return state.certificationStatus[certId] || null;
+}
+
+function activeCertifications() {
+  return (state.manifest?.certifications || []).filter((cert) => !certificationArchive(cert.id));
+}
+
+function archiveCurrentCertification() {
+  const cert = currentCertification();
+  if (!cert) return;
+  el("archiveDescription").textContent = `Choose how you completed ${cert.name}. You can restore it from the gallery at any time.`;
+  el("archiveDialog").showModal();
+}
+
+function saveCertificationArchive(status) {
+  const cert = currentCertification();
+  if (!cert) return;
+  const saved = CertificationStatus.archive(localStorage, state.certificationStatus, cert.id, status);
+  if (!saved) {
+    toast("Could not save archive status in this browser");
+    return;
+  }
+  state.certificationStatus = CertificationStatus.read(localStorage);
+  renderCatalogControls();
+  renderCertificationGallery();
+  if (!activeCertifications().length) openCertificationGallery();
+  toast(status === "passed" ? "Certification archived as passed" : "Certification archived as finished studying");
+}
+
+function restoreCertification(certId) {
+  const saved = CertificationStatus.restore(localStorage, state.certificationStatus, certId);
+  if (!saved) {
+    toast("Could not restore certification in this browser");
+    return;
+  }
+  state.certificationStatus = CertificationStatus.read(localStorage);
+  renderCatalogControls();
+  renderCertificationGallery();
+  toast("Certification restored to active study");
+}
+
+function certificationStats(cert) {
+  let attempts = 0;
+  for (const exam of cert.exams || []) attempts += exam.attempts?.length || 0;
+  return { exams: cert.exams?.length || 0, attempts };
+}
+
+async function certificationMaterialCounts(cert) {
+  if (state.certificationMaterialCounts.has(cert.id)) return state.certificationMaterialCounts.get(cert.id);
+  const counts = { reports: 0, stories: 0 };
+  try {
+    for (const examEntry of cert.exams || []) {
+      const examResponse = await fetch(`${DATA}${examEntry.path}`);
+      if (!examResponse.ok) throw new Error("exam manifest unavailable");
+      const exam = await examResponse.json();
+      for (const material of exam.materials || []) {
+        if (material.type === "report") counts.reports++;
+        if (material.type === "story") counts.stories++;
+      }
+      const attempts = await Promise.all((examEntry.attempts || []).map(async (entry) => {
+        const response = await fetch(`${DATA}${entry.path}`);
+        if (!response.ok) throw new Error("attempt manifest unavailable");
+        return response.json();
+      }));
+      for (const attempt of attempts) for (const material of attempt.materials || []) {
+        if (material.type === "report") counts.reports++;
+        if (material.type === "story") counts.stories++;
+      }
+    }
+    state.certificationMaterialCounts.set(cert.id, counts);
+    return counts;
+  } catch {
+    state.certificationMaterialCounts.set(cert.id, null);
+    return null;
+  }
+}
+
+function renderCertificationCard(cert, counts) {
+  const archive = certificationArchive(cert.id);
+  const summary = certificationStats(cert);
+  const label = archive?.status === "passed" ? "Passed" : archive ? "Finished studying" : "Active";
+  const archivedDate = archive ? new Date(archive.archivedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : "";
+  const materials = counts ? `${counts.reports} Reports · ${counts.stories} Stories` : "Materials unavailable";
+  return `<article class="cert-card${archive ? " cert-card--archived" : ""}">
+    <div class="cert-card__top"><span class="cert-card__status">${esc(label)}</span>${archive ? `<span class="cert-card__date">Archived ${esc(archivedDate)}</span>` : ""}</div>
+    <h3>${esc(cert.name)}</h3>
+    ${cert.code ? `<div class="cert-card__code">${esc(cert.code)}</div>` : ""}
+    <div class="cert-card__metrics"><span><b>${summary.exams}</b> mock exams</span><span><b>${summary.attempts}</b> attempts</span><span>${esc(materials)}</span></div>
+    <div class="cert-card__actions">
+      <button class="btn btn--primary" data-open-cert="${esc(cert.id)}">Open study</button>
+      ${archive ? `<button class="btn" data-restore-cert="${esc(cert.id)}">Restore to active</button>` : ""}
+    </div>
+  </article>`;
+}
+
+async function renderCertificationGallery() {
+  const host = el("galleryContent");
+  if (!host || !state.manifest) return;
+  const token = ++state.galleryRenderToken;
+  const certs = state.manifest.certifications || [];
+  if (!certs.length) {
+    host.innerHTML = `<div class="empty">No certifications in <code>data/index.json</code> yet.</div>`;
+    return;
+  }
+  host.innerHTML = `<div class="empty">Loading certification summaries…</div>`;
+  const counts = await Promise.all(certs.map(certificationMaterialCounts));
+  if (token !== state.galleryRenderToken || !state.galleryOpen) return;
+  const active = certs.filter((cert) => !certificationArchive(cert.id));
+  const archived = certs.filter((cert) => certificationArchive(cert.id));
+  const section = (title, items) => items.length
+    ? `<section class="cert-gallery__section"><h2>${title}<span>${items.length}</span></h2><div class="cert-gallery__grid">${items.map((cert) => renderCertificationCard(cert, counts[certs.indexOf(cert)])).join("")}</div></section>`
+    : "";
+  host.innerHTML = `${section("Currently studying", active)}${section("Archived", archived)}` || `<div class="empty">No certifications to show.</div>`;
+}
+
+function openCertificationGallery({ push = true } = {}) {
+  if (state.report.open) closeReportPage();
+  state.galleryOpen = true;
+  el("shell").hidden = true;
+  el("certGallery").hidden = false;
+  document.title = "Certification Gallery — Skill Builder";
+  if (push && location.hash !== "#/certifications/gallery") location.hash = "#/certifications/gallery";
+  renderCertificationGallery();
+  el("galleryTitle").focus({ preventScroll: true });
+}
+
+function closeCertificationGallery() {
+  state.galleryOpen = false;
+  el("certGallery").hidden = true;
+  el("shell").hidden = false;
+  document.title = APP_TITLE;
+}
+
+function openCertificationStudy(certId) {
+  const cert = state.manifest.certifications.find((item) => item.id === certId);
+  if (!cert) return;
+  closeCertificationGallery();
+  state.selectedCertificationId = cert.id;
+  const exam = cert.exams?.[0] || null;
+  state.selectedExamId = exam?.id || null;
+  if (!exam) {
+    state.exam = null;
+    state.attempt = null;
+    renderAll();
+    location.hash = `#${cert.id}`;
+    return;
+  }
+  loadAttempt(exam.attempts?.[0]?.id || null).catch((err) => toast(err.message));
 }
 
 function currentExamEntry() {
@@ -439,18 +595,27 @@ function attachMaterials(attempt) {
     q.topic = report?.title || "";
     q.card = story?.url || null;
     q.cardTopic = story?.title || "";
-    q.cardMeta = {};
   }
 }
 
 function renderCatalogControls() {
   const cert = currentCertification();
+  el('openPreTestReview').href = `#/certifications/${cert?.id || ''}/pre-test-review`;
   const examEntry = currentExamEntry();
   const attempts = examEntry?.attempts || [];
+  const archive = cert && certificationArchive(cert.id);
+  const certLabel = el("certSelector").closest("label");
+  certLabel.hidden = Boolean(archive);
+  el("certArchiveState").hidden = !archive;
+  el("certArchiveState").innerHTML = archive
+    ? `<span>Archived · ${archive.status === "passed" ? "Passed" : "Finished studying"}</span><button class="linkbtn" id="restoreCurrentCert">Restore</button>`
+    : "";
+  el("archiveCertification").hidden = !cert || Boolean(archive);
   el("certSelector").innerHTML = state.manifest.certifications
+    .filter((c) => !certificationArchive(c.id))
     .map((c) => `<option value="${esc(c.id)}">${esc(c.name)}${c.code ? ` (${esc(c.code)})` : ""}</option>`)
     .join("");
-  el("certSelector").value = state.selectedCertificationId || "";
+  if (!archive) el("certSelector").value = state.selectedCertificationId || "";
   el("examSelector").innerHTML = (cert?.exams || [])
     .map((x) => `<option value="${esc(x.id)}">${esc(humanizeId(x.id))}</option>`).join("");
   el("examSelector").value = state.selectedExamId || "";
@@ -511,7 +676,7 @@ function renderSummary() {
         ${a.exam.url ? ` · <a href="${esc(a.exam.url)}" target="_blank" rel="noopener">open source</a>` : ""}
       </div>
     </div>
-    <div>
+    <div class="head__score">
       <div class="score ${a.score.passed ? "score--passed" : "score--failed"}">
         <span class="score__value">${a.score.percent}%</span>
         <span class="score__cut">pass mark ${a.score.passingPercent}%</span>
@@ -1280,6 +1445,37 @@ function splitReport(text) {
   return { title, meta, body: lines.slice(i).join("\n").trim() };
 }
 
+const reportMobile = window.matchMedia('(max-width: 900px)');
+
+function placeReviewTopics() {
+  const review = state.report.material?.kind === 'pretest';
+  const mobile = review && reportMobile.matches;
+  const topics = el('reportTopics');
+  const header = el('reportTopicHeader');
+  const destination = mobile ? header : el('reportAside');
+  if (topics.parentElement !== destination) {
+    if (mobile) destination.append(topics);
+    else destination.insertBefore(topics, el('reportBack'));
+    topics.open = !mobile;
+  }
+  if (review && !mobile) topics.open = true;
+  header.hidden = !mobile || !state.report.headings.length;
+  el('reviewTopicSteps').hidden = !review || !state.report.headings.length;
+  el('reportTopicSearch').hidden = !review;
+  el('reportToc').setAttribute('aria-label', review ? 'Review topics' : 'Report contents');
+}
+
+function filterReportTopics() {
+  const query = el('reportTopicSearch').value.trim().toLocaleLowerCase();
+  let visible = 0;
+  for (const link of el('reportToc').querySelectorAll('a[data-sec]')) {
+    link.hidden = !link.textContent.toLocaleLowerCase().includes(query);
+    if (!link.hidden) visible++;
+  }
+  el('reportTopicEmpty').hidden = Boolean(visible) || !state.report.headings.length;
+  if (!query) highlightReportTopic(el('reportToc').querySelector('[aria-current="true"]')?.dataset.sec, true);
+}
+
 function buildReportToc() {
   const heads = [...el("reportContent").querySelectorAll("h2, h3")];
   state.report.headings = heads;
@@ -1287,6 +1483,7 @@ function buildReportToc() {
   el("reportView").classList.toggle("is-single", !heads.length);
   if (!heads.length) {
     toc.innerHTML = "";
+    placeReviewTopics();
     return;
   }
   heads.forEach((h, i) => {
@@ -1300,6 +1497,8 @@ function buildReportToc() {
         )}</a>`
     )
     .join("");
+  filterReportTopics();
+  placeReviewTopics();
 }
 
 /* Internal report links stay inside this reading page; external links keep
@@ -1357,17 +1556,57 @@ function onReportScroll() {
     if (h.getBoundingClientRect().top <= line) active = h.id;
   }
   if (pct >= 99 && heads.length) active = heads[heads.length - 1].id;
-  for (const a of el("reportToc").querySelectorAll("a[data-sec]")) {
-    const current = a.dataset.sec === active;
-    a.classList.toggle("is-active", current);
-    if (current) a.setAttribute("aria-current", "true");
-    else a.removeAttribute("aria-current");
-  }
+  highlightReportTopic(active);
 
   if (state.report.n && pct >= 99) {
     if (max > 4 && sc.scrollTop <= 0) return;
     markRead(state.report.n, true, true);
   }
+}
+
+function highlightReportTopic(active, reveal = false) {
+  const headings = state.report.headings;
+  const index = Math.max(0, headings.findIndex(h => h.id === active));
+  state.report.topicIndex = index;
+  if (state.report.material?.kind === 'pretest' && headings.length) {
+    const count = el('reviewTopicCount');
+    const label = `${index + 1}/${headings.length}`;
+    if (count.textContent !== label) {
+      count.textContent = label;
+      count.setAttribute('aria-label', `Topic ${index + 1} of ${headings.length}`);
+    }
+    el('reviewTopicPrevious').disabled = index === 0;
+    el('reviewTopicNext').disabled = index === headings.length - 1;
+  }
+  for (const a of el("reportToc").querySelectorAll("a[data-sec]")) {
+    const current = a.dataset.sec === active;
+    const wasCurrent = a.getAttribute('aria-current') === 'true';
+    a.classList.toggle("is-active", current);
+    if (current) a.setAttribute("aria-current", "true");
+    else a.removeAttribute("aria-current");
+    if (current && (!wasCurrent || reveal) && !a.hidden && state.report.material?.kind === 'pretest' && !reportMobile.matches) {
+      const nav = el('reportToc');
+      const item = a.getBoundingClientRect(), frame = nav.getBoundingClientRect();
+      if (item.top < frame.top) nav.scrollTop += item.top - frame.top;
+      else if (item.bottom > frame.bottom) nav.scrollTop += item.bottom - frame.bottom;
+    }
+  }
+
+}
+
+function goToReportTopic(target, { focus = true, instant = false } = {}) {
+  if (!target) return;
+  if (state.report.material?.kind === 'pretest' && reportMobile.matches) el('reportTopics').open = false;
+  if (focus) {
+    target.setAttribute('tabindex', '-1');
+    target.focus({ preventScroll: true });
+  }
+  const scroll = el('reportScroll');
+  scroll.scrollTo({
+    top: scroll.scrollTop + target.getBoundingClientRect().top - scroll.getBoundingClientRect().top - 20,
+    behavior: instant || matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+  });
+  highlightReportTopic(target.id, true);
 }
 
 async function openReportPage(material) {
@@ -1376,6 +1615,18 @@ async function openReportPage(material) {
   state.report.open = true;
   state.report.material = material;
   state.report.n = material.questionNumber || null;
+  state.report.reviewBundle = null;
+  state.report.headings = [];
+  el('reviewSaveOffline').hidden = material.kind !== 'pretest';
+  el('reviewSaveOffline').disabled = true;
+  el('reviewSaveOffline').textContent = 'Save offline';
+  el('reviewNotice').hidden = true;
+  el('reviewReading').hidden = true;
+  el('reportView').classList.toggle('is-pretest', material.kind === 'pretest');
+  el('reportTopics').open = material.kind !== 'pretest';
+  el('reportTopicSearch').value = '';
+  el('reportTopicEmpty').hidden = true;
+  placeReviewTopics();
 
   document.body.classList.add("is-report");
   document.body.style.overflow = "hidden";
@@ -1410,9 +1661,13 @@ async function openReportPage(material) {
   document.title = `${plainText(material.title || "Report")} — Skill Builder`;
 
   try {
-    const res = await fetch(material.url);
-    if (!res.ok) throw new Error(`${material.url} returned ${res.status}`);
-    const text = await res.text();
+    let text;
+    if (material.loadText) text = await material.loadText();
+    else {
+      const res = await fetch(material.url);
+      if (!res.ok) throw new Error('Report unavailable');
+      text = await res.text();
+    }
     if (token !== state.report.token) return;
 
     const parsed = splitReport(text);
@@ -1449,10 +1704,13 @@ async function openReportPage(material) {
     wrapTables(content);
     rewriteReportLinks(content);
     decorateReport(content);
+    if (material.decorate) material.decorate(content);
     buildReportToc();
+    el('reportTopicsSummary').textContent = `Browse topics (${state.report.headings.length})`;
     content.setAttribute("aria-busy", "false");
     el("reportScroll").scrollTop = 0;
     el("reportTitle").focus({ preventScroll: true });
+    onReportScroll();
     requestAnimationFrame(onReportScroll);
   } catch (err) {
     if (token !== state.report.token) return;
@@ -1465,6 +1723,7 @@ async function openReportPage(material) {
 
 function closeReportPage() {
   if (!state.report.open) return;
+  const wasReview = state.report.material?.kind === 'pretest';
   state.report.open = false;
   state.report.token++;
   state.report.material = null;
@@ -1480,10 +1739,29 @@ function closeReportPage() {
   document.body.style.overflow = "";
   setReportShellInert(false);
   document.title = APP_TITLE;
+  if (wasReview) {
+    if (!state.attempt) renderAll();
+    el('openPreTestReview').focus();
+  }
+  state.report.reviewBundle = null;
 }
 
 function handleReportRoute() {
-  if (!state.attempt) return;
+  const reviewRoute = /^#\/certifications\/([a-z0-9-]+)\/pre-test-review(?:\?reading=(10|30|60))?$/.exec(location.hash);
+  if (reviewRoute) {
+    if (state.report.open && state.report.material?.reviewCertId === reviewRoute[1] && state.report.material?.readingMinutes === Number(reviewRoute[2] || 60)) return;
+    openPreTestReview(reviewRoute[1], Number(reviewRoute[2] || 60));
+    return;
+  }
+  if (state.report.material?.kind === 'pretest') closeReportPage();
+  if (!state.attempt) {
+    if (currentExamEntry()) {
+      loadAttempt(currentExamEntry().attempts[0]?.id || null, { push: false })
+        .then(() => { if (state.attempt) handleReportRoute(); })
+        .catch(() => toast('The selected attempt could not be loaded.'));
+    }
+    return;
+  }
   const parts = location.hash.slice(1).split("/");
   const id = parts[3] || null;
   if (!id) {
@@ -1501,6 +1779,116 @@ function handleReportRoute() {
   } else if (state.report.open) {
     closeReportPage();
   }
+}
+
+async function openPreTestReview(certId, readingMinutes = 60) {
+  const cert = state.manifest?.certifications.find(c => c.id === certId);
+  if (!cert) { toast('Certification not found'); return; }
+  if (state.selectedCertificationId !== certId) {
+    state.selectedCertificationId = certId;
+    state.selectedExamId = cert.exams[0]?.id || null;
+    state.attempt = null; state.exam = null;
+    renderCatalogControls(); renderRail();
+  }
+  let bundle;
+  const material = {
+    id: 'pre-test-review', kind: 'pretest', reviewCertId: certId, readingMinutes,
+    title: 'Pre-Test Review', url: 'data/',
+    loadText: async () => {
+      let cache;
+      try { cache = await caches.open(PreTestReview.CACHE); } catch { /* Reading still works without Cache API. */ }
+      bundle = await PreTestReview.load(certId, { cache, currentCert: cert });
+      if (bundle.missing) throw new Error('Certification not found');
+      if (bundle.empty) return '# Pre-Test Review\n\nNo review has been prepared for this certification yet. It will be updated when study content is prepared.';
+      material.url = PreTestReview.safePath(`data/${certId}`, bundle.cert.preTestReview.path, '.json');
+      const date = new Date(bundle.review.updatedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+      const mapped = bundle.review.coverage.filter(q => q.topicIds?.length).length;
+      const selectedText = bundle.readings?.[readingMinutes] ?? bundle.text;
+      return `# Pre-Test Review${bundle.review.readingVersions ? ` — ${readingMinutes === 60 ? '1 hour' : readingMinutes + ' minutes'}` : ''}\n\n- **Certification:** ${cert.name}\n- **Updated:** ${date}\n- **Attempts included:** ${bundle.review.inputs.attempts.length}\n- **Questions in full review:** ${mapped}\n\n${selectedText.replace(/^# .+\r?\n/, '')}`;
+    },
+    decorate: content => {
+      if (!bundle?.review) { el('reviewSaveOffline').hidden = true; return; }
+      state.report.reviewBundle = bundle;
+      el('reviewReading').hidden = !bundle.review.readingVersions;
+      el('reviewReadingTime').value = String(readingMinutes);
+      const notice = el('reviewNotice');
+      const messages = [];
+      if (bundle.review.readingVersions) messages.push(readingMinutes < 60 ? 'Selected lessons for this reading budget; the 1-hour document retains full coverage. Reading times are approximate.' : 'Full review. Allow about 1 hour for deliberate study; reading speed varies.');
+      const draft = bundle.review.editorialStatus !== 'reviewed';
+      if (draft) messages.push('Editorial draft: the complete study synthesis has not yet been verified.');
+      if (bundle.stale) messages.push('Update needed: attempts or materials have changed since this review was prepared.');
+      if (bundle.offline) messages.push('Saved copy. Changes made since it was saved cannot be checked offline.');
+      else if (!bundle.verified) messages.push('Freshness could not be verified for all study inputs.');
+      else if (!bundle.stale) messages.push('Up to date with all available attempts and study materials.');
+      if (bundle.review.gaps.length) messages.push(`${bundle.review.gaps.length} limitation(s); see Review limitations below.`);
+      const pending = bundle.review.coverage.filter(q => q.pending);
+      if (pending.length) messages.push(`${pending.length} question(s) still need editorial review.`);
+      const offlineSupported = 'serviceWorker' in navigator && 'caches' in globalThis;
+      if (!offlineSupported) messages.push('Offline saving requires HTTPS or localhost. You can read this review online.');
+      notice.textContent = messages.join(' ');
+      notice.hidden = false;
+      notice.classList.toggle('is-warning', Boolean(draft || bundle.stale || pending.length || bundle.review.gaps.length || !bundle.verified));
+      el('reviewSaveOffline').disabled = !offlineSupported;
+      el('reviewSaveOffline').textContent = !offlineSupported ? 'Offline unavailable' : bundle.offline ? 'Save offline again' : 'Save offline';
+      if (bundle.review.gaps.length) {
+        const details = document.createElement('details'); details.className = 'pretest-sources';
+        const summary = document.createElement('summary'); summary.textContent = 'Review limitations';
+        const list = document.createElement('ul');
+        for (const gap of bundle.review.gaps) { const li = document.createElement('li'); li.textContent = gap; list.append(li); }
+        details.append(summary, list); content.prepend(details);
+      }
+      for (const topic of bundle.review.topics) {
+        const heading = [...content.querySelectorAll('h2')].find(h => h.textContent.trim() === topic.heading);
+        if (!heading) continue;
+        heading.id = `review-topic-${topic.id}`;
+        const refs = bundle.review.coverage.filter(q => q.topicIds?.includes(topic.id));
+        const references = topic.references || [];
+        if (!refs.length && !references.length) continue;
+        const details = document.createElement('details');
+        details.className = 'pretest-sources';
+        const summary = document.createElement('summary');
+        summary.textContent = references.length
+          ? `Sources (${refs.length} question${refs.length === 1 ? '' : 's'}, ${references.length} reference${references.length === 1 ? '' : 's'})`
+          : `Source questions (${refs.length})`;
+        details.append(summary);
+        const list = document.createElement('ul');
+        for (const q of refs) {
+          const li = document.createElement('li');
+          const link = document.createElement('a');
+          link.href = `#${certId}/${encodeURIComponent(q.examId)}/${encodeURIComponent(q.attemptId)}${q.reportId ? '/' + encodeURIComponent(q.reportId) : ''}`;
+          link.target = '_blank'; link.rel = 'noopener';
+          link.textContent = `${humanizeId(q.examId)} · ${q.attemptId} · Q${q.questionNumber}`;
+          li.append(link, ` — ${(bundle.review.inputs.eligibleQuestions.find(x => x.examId === q.examId && x.attemptId === q.attemptId && x.questionNumber === q.questionNumber)?.reasons || []).join(', ')}`);
+          list.append(li);
+        }
+        for (const reference of references) {
+          const url = new URL(reference.url);
+          if (url.protocol !== 'https:' || url.username || url.password) continue;
+          const li = document.createElement('li');
+          const link = document.createElement('a');
+          link.href = url.href; link.target = '_blank'; link.rel = 'noopener noreferrer';
+          link.textContent = reference.title;
+          li.append(link); list.append(li);
+        }
+        details.append(list);
+        let next = heading.nextElementSibling;
+        while (next && next.tagName !== 'H2') next = next.nextElementSibling;
+        content.insertBefore(details, next);
+      }
+      if (pending.length) {
+        const details = document.createElement('details');
+        const summary = document.createElement('summary'); summary.textContent = 'Editorial gaps';
+        details.append(summary);
+        for (const q of pending) {
+          const p = document.createElement('p');
+          p.textContent = `${q.examId} · ${q.attemptId} · Q${q.questionNumber}: ${q.pending}`;
+          details.append(p);
+        }
+        content.prepend(details);
+      }
+    },
+  };
+  await openReportPage(material);
 }
 
 /* ---------- PWA: install prompt + offline stories ---------- */
@@ -1729,24 +2117,27 @@ async function showDeckSlide(i, slide) {
   const kicker = `<div class="deck__kicker"><span class="deck__step">${slide + 1}/4</span>${esc(
     CARD_SECTIONS[slide]
   )}</div>`;
-  const head =
-    slide === 0
-      ? `<div class="deck__meta">
-           ${q.cardMeta?.domain ? `<span><b>D${esc(q.cardMeta.domain)}</b></span>` : ""}
-           ${q.cardMeta?.task ? `<span>${esc(q.cardMeta.task)}</span>` : ""}
-           ${q.cardMeta?.signal ? `<span class="deck__signal">the signal in the stem: ${renderInline(
-             q.cardMeta.signal
-           )}</span>` : ""}
-         </div>`
-      : "";
 
-  el("deckBody").innerHTML = kicker + head + `<p class="panel__hint">Loading…</p>`;
+  el("deckBody").innerHTML = kicker + `<p class="panel__hint">Loading…</p>`;
   try {
     const card = await loadCard(q);
     const body = card.screens[slide].body.join("\n").trim();
     // A card sits in the cards/ subfolder, so relative links resolve from there.
     const cardUrl = cardPath(q);
     const base = cardUrl.slice(0, cardUrl.lastIndexOf("/") + 1);
+    // The domain, the task and the signal come from the card's own front
+    // matter, which is only known once the card has been loaded.
+    const meta = card.head.meta || {};
+    const head =
+      slide === 0
+        ? `<div class="deck__meta">
+             ${meta.domain ? `<span><b>${esc(meta.domain)}</b></span>` : ""}
+             ${meta.task ? `<span>${esc(meta.task)}</span>` : ""}
+             ${meta.signal ? `<span class="deck__signal">the signal in the stem: ${renderInline(
+               meta.signal
+             )}</span>` : ""}
+           </div>`
+        : "";
     el("deckBody").innerHTML =
       kicker + head + (body ? renderMarkdown(body, base) : `<p class="panel__hint">This screen is empty.</p>`);
     wrapTables(el("deckBody"));
@@ -1837,7 +2228,12 @@ function toast(msg) {
 async function loadAttempt(id, { push = true } = {}) {
   const entry = attemptEntry(id);
   const examEntry = currentExamEntry();
-  if (!examEntry) throw new Error("The selected mock exam is missing from data/index.json");
+  if (!examEntry) {
+    state.exam = null; state.attempt = null;
+    if (push) location.hash = `#${state.selectedCertificationId}`;
+    renderAll();
+    return;
+  }
   const examResponse = await fetch(`${DATA}${examEntry.path}`);
   if (!examResponse.ok) throw new Error(`${DATA}${examEntry.path} not found (${examResponse.status})`);
   state.exam = await examResponse.json();
@@ -1886,18 +2282,40 @@ function setRail(open) {
   el("railBtn").setAttribute("aria-expanded", String(open));
 }
 
+/* Theme selection cycles through the three instrument themes in this order.
+   "dark"/"light" were the previous values and migrate to their closest match,
+   so an existing local choice is not lost. */
+const THEMES = ["graphite", "workshop", "chalk"];
+const THEME_MIGRATION = { dark: "graphite", light: "workshop" };
+const THEME_GLYPH = { graphite: "◑", workshop: "◐", chalk: "○" };
+const THEME_CANVAS = { graphite: "#151719", workshop: "#e8e1ce", chalk: "#e9e7e1" };
+
 function paintTheme() {
-  const light = document.documentElement.dataset.theme === "light";
+  const theme = document.documentElement.dataset.theme;
+  const current = THEMES.includes(theme) ? theme : "graphite";
+  const next = THEMES[(THEMES.indexOf(current) + 1) % THEMES.length];
+  const label = `Theme: ${current}. Switch to ${next}`;
   for (const id of ["themeBtn", "reportTheme"]) {
     const button = el(id);
-    if (button) button.textContent = light ? "◐" : "◑";
+    if (!button) continue;
+    button.textContent = THEME_GLYPH[current];
+    button.title = label;
+    button.setAttribute("aria-label", label);
   }
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = THEME_CANVAS[current];
 }
 
 function toggleTheme() {
-  const next = document.documentElement.dataset.theme === "light" ? "dark" : "light";
+  const theme = document.documentElement.dataset.theme;
+  const current = THEMES.includes(theme) ? theme : "graphite";
+  const next = THEMES[(THEMES.indexOf(current) + 1) % THEMES.length];
   document.documentElement.dataset.theme = next;
-  localStorage.setItem("sb-theme", next);
+  try {
+    localStorage.setItem("sb-theme", next);
+  } catch {
+    /* private mode: the theme still applies for this session */
+  }
   paintTheme();
 }
 
@@ -1924,6 +2342,29 @@ function wire() {
   });
   el("attemptSelector").addEventListener("change", () => {
     loadAttempt(el("attemptSelector").value).catch((err) => toast(err.message));
+  });
+  el("archiveCertification").addEventListener("click", archiveCurrentCertification);
+  el("archiveCancel").addEventListener("click", () => el("archiveDialog").close());
+  el("archiveForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const status = new FormData(event.currentTarget).get("archiveStatus");
+    saveCertificationArchive(status);
+    if (state.certificationStatus[state.selectedCertificationId]) el("archiveDialog").close();
+  });
+  el("openGallery").addEventListener("click", () => openCertificationGallery());
+  el("galleryBack").addEventListener("click", () => {
+    const target = selectionHash();
+    closeCertificationGallery();
+    if (location.hash !== target) location.hash = target;
+  });
+  el("galleryContent").addEventListener("click", (event) => {
+    const restore = event.target.closest("[data-restore-cert]");
+    if (restore) return restoreCertification(restore.dataset.restoreCert);
+    const open = event.target.closest("[data-open-cert]");
+    if (open) openCertificationStudy(open.dataset.openCert);
+  });
+  el("certArchiveState").addEventListener("click", (event) => {
+    if (event.target.closest("#restoreCurrentCert")) restoreCertification(state.selectedCertificationId);
   });
   el("materialShelf").addEventListener("click", (event) => {
     const button = event.target.closest("[data-material]");
@@ -2045,6 +2486,25 @@ function wire() {
 
   // full-page report
   el("reportPrint").addEventListener("click", () => window.print());
+  el('reviewReadingTime').addEventListener('change', event => {
+    const material = state.report.material;
+    if (material?.kind === 'pretest') location.hash = `#/certifications/${material.reviewCertId}/pre-test-review?reading=${event.target.value}`;
+  });
+  el('reviewSaveOffline').addEventListener('click', async () => {
+    const bundle = state.report.reviewBundle;
+    if (!bundle) return;
+    const button = el('reviewSaveOffline');
+    button.disabled = true; button.textContent = 'Saving…';
+    try {
+      if (!navigator.serviceWorker?.controller) throw new Error('Reload once online to enable offline reading.');
+      await PreTestReview.save(bundle, await caches.open(PreTestReview.CACHE));
+      button.textContent = 'Saved offline';
+      toast('Complete Pre-Test Review saved for offline reading');
+    } catch {
+      button.textContent = 'Retry save';
+      toast('Could not save the review. Keep the page open; reconnect or reload online and retry.');
+    } finally { button.disabled = false; }
+  });
   el("reportReadBtn").addEventListener("click", () => {
     if (state.report.n) markRead(state.report.n, !isRead(state.report.n));
   });
@@ -2053,21 +2513,43 @@ function wire() {
     const link = e.target.closest("a[data-sec]");
     if (!link) return;
     e.preventDefault();
-    document.getElementById(link.dataset.sec)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    goToReportTopic(document.getElementById(link.dataset.sec));
   });
-  window.addEventListener("hashchange", handleReportRoute);
+  for (const [id, delta] of [['reviewTopicPrevious', -1], ['reviewTopicNext', 1]]) {
+    el(id).addEventListener('click', () => {
+      const target = state.report.headings[(state.report.topicIndex || 0) + delta];
+      goToReportTopic(target, { focus: false, instant: true });
+    });
+  }
+  el('reportTopicSearch').addEventListener('input', filterReportTopics);
+  reportMobile.addEventListener('change', placeReviewTopics);
+  window.addEventListener("hashchange", () => {
+    if (location.hash === "#/certifications/gallery") {
+      openCertificationGallery({ push: false });
+      return;
+    }
+    if (state.galleryOpen) closeCertificationGallery();
+    handleReportRoute();
+  });
 
   el("themeBtn").addEventListener("click", toggleTheme);
   el("reportTheme").addEventListener("click", toggleTheme);
 
   const saved = localStorage.getItem("sb-theme");
-  if (saved) document.documentElement.dataset.theme = saved;
+  const theme = THEME_MIGRATION[saved] || saved;
+  if (THEMES.includes(theme)) document.documentElement.dataset.theme = theme;
   paintTheme();
 
   document.addEventListener("keydown", (e) => {
     const typingNow = /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
 
     if (e.key === "Escape") {
+      if (state.report.open && state.report.material?.kind === 'pretest' && reportMobile.matches && el('reportTopics').open) {
+        e.preventDefault();
+        el('reportTopics').open = false;
+        el('reportTopicsSummary').focus();
+        return;
+      }
       if (state.report.open) {
         e.preventDefault();
         const target = selectionHash();
@@ -2150,9 +2632,31 @@ async function boot() {
     el("list").innerHTML = `<div class="empty">Could not find <code>data/index.json</code>. Run <code>make serve</code> from the project root.</div>`;
     return;
   }
+  state.certificationStatus = CertificationStatus.read(localStorage);
   const certifications = state.manifest.certifications || [];
+  if (location.hash === "#/certifications/gallery") {
+    openCertificationGallery({ push: location.hash !== "#/certifications/gallery" });
+    return;
+  }
   if (!certifications.length) {
     el("list").innerHTML = `<div class="empty">No certifications in <code>data/index.json</code> yet.</div>`;
+    return;
+  }
+  // A certification review must open even if an individual attempt is unavailable.
+  const directReview = /^#\/certifications\/([a-z0-9-]+)\/pre-test-review(?:\?reading=(10|30|60))?$/.exec(location.hash);
+  const directCert = directReview && certifications.find(c => c.id === directReview[1]);
+  if (directCert) {
+    state.selectedCertificationId = directCert.id;
+    state.selectedExamId = directCert.exams[0]?.id || null;
+    renderCatalogControls(); renderRail();
+    await openPreTestReview(directCert.id, Number(directReview[2] || 60));
+    return;
+  }
+  const hasDirectCertificationRoute = certifications.some((cert) =>
+    location.hash === `#${cert.id}` || location.hash.startsWith(`#${cert.id}/`)
+  );
+  if (certifications.length && activeCertifications().length === 0 && !hasDirectCertificationRoute) {
+    openCertificationGallery();
     return;
   }
   const hash = location.hash.slice(1).split("/");
@@ -2160,7 +2664,7 @@ async function boot() {
   try { saved = JSON.parse(localStorage.getItem("sb-selection") || "null"); } catch { /* ignore invalid local selection */ }
   const candidates = [
     hash.length >= 2 ? { certificationId: hash[0], examId: hash[1], attemptId: hash[2] || null } : null,
-    saved,
+    saved && !certificationArchive(saved.certificationId) ? saved : null,
   ].filter(Boolean);
   let selection = null;
   for (const candidate of candidates) {
@@ -2178,7 +2682,10 @@ async function boot() {
     selection = { cert, exam, attempt: exam?.attempts?.[0] };
   }
   if (!selection.exam) {
+    state.selectedCertificationId = selection.cert.id;
+    renderCatalogControls();
     el("list").innerHTML = `<div class="empty">This certification has no mock exams yet.</div>`;
+    handleReportRoute();
     return;
   }
   state.selectedCertificationId = selection.cert.id;

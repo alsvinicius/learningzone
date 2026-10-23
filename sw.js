@@ -6,7 +6,7 @@
 
 importScripts("cache-utils.js");
 
-const VERSION = "sb-v3";
+const VERSION = "sb-v11";
 const STATIC_CACHE = `${VERSION}-static`;
 const CONTENT_CACHE = `${VERSION}-content`;
 const FONT_CACHE = `${VERSION}-fonts`;
@@ -14,8 +14,10 @@ const FONT_CACHE = `${VERSION}-fonts`;
 const CORE = [
   "./",
   "index.html",
-  "app.css?v=11",
-  "app.js?v=11",
+  "app.css?v=33",
+  "app.js?v=33",
+  "pretest.js?v=33",
+  "certification-status.js?v=33",
   "progress.js",
   "cache-utils.js",
   "manifest.webmanifest",
@@ -42,7 +44,7 @@ self.addEventListener("activate", (event) => {
       const keys = await caches.keys();
       await Promise.all(
         keys
-          .filter((k) => k.startsWith("sb-") && ![STATIC_CACHE, CONTENT_CACHE, FONT_CACHE].includes(k))
+          .filter((k) => k.startsWith("sb-") && ![STATIC_CACHE, CONTENT_CACHE, FONT_CACHE, 'sb-pretest-bundles-v1'].includes(k))
           .map((k) => caches.delete(k))
       );
       if ("navigationPreload" in self.registration) {
@@ -111,6 +113,12 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Review snapshots need current bytes. Their verified bundle owns offline fallback.
+  if (request.cache === 'no-store') {
+    event.respondWith(fetch(request));
+    return;
+  }
+
   // App navigation while offline opens the cached shell, which then renders
   // from cached data.
   if (request.mode === "navigate") {
@@ -141,7 +149,7 @@ self.addEventListener("fetch", (event) => {
   const rel = url.pathname.replace(/^\//, "");
   const base = rel.split("/").pop();
   const isShell =
-    ["", "index.html", "app.css", "app.js", "progress.js", "cache-utils.js", "manifest.webmanifest", "sw.js"].includes(rel) ||
+    ["", "index.html", "app.css", "app.js", "pretest.js", "certification-status.js", "progress.js", "cache-utils.js", "manifest.webmanifest", "sw.js"].includes(rel) ||
     base === "index.html" ||
     rel.startsWith("icons/");
 

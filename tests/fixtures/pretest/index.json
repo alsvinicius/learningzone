@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "certifications": [
+    {
+      "id": "sample-cert",
+      "name": "Synthetic certification",
+      "exams": [
+        {
+          "id": "mock-one",
+          "path": "sample-cert/mock-one/exam.json",
+          "attempts": [
+            {
+              "id": "try-1",
+              "path": "sample-cert/mock-one/attempts/try-1/attempt.json"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

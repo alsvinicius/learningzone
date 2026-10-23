@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "certificationId": "sample-cert",
+  "examId": "mock-one",
+  "attemptId": "try-1",
+  "score": {},
+  "totals": {},
+  "window": {},
+  "materials": [],
+  "questions": [
+    {
+      "n": 1,
+      "status": "incorrect"
+    },
+    {
+      "n": 2,
+      "status": "correct",
+      "confidence": "EDUCATED_GUESS"
+    },
+    {
+      "n": 3,
+      "status": "correct",
+      "learnerNotes": "Please review the synthetic timeout rule."
+    },
+    {
+      "n": 4,
+      "status": "skipped"
+    },
+    {
+      "n": 5,
+      "status": "correct",
+      "confidence": "UNSURE"
+    },
+    {
+      "n": 6,
+      "status": "correct",
+      "flagged": true
+    },
+    {
+      "n": 7,
+      "status": "correct"
+    }
+  ]
+}

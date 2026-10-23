@@ -30,3 +30,7 @@ Uma referência de material contém `scope` (`exam` ou `attempt`) e `id`, sem ca
 ## Conversores
 
 Um conversor é código local específico da fonte, executado explicitamente pelo usuário. Ele lê um arquivo local, não deve fazer chamadas de rede, cria o formato normalizado e não sobrescreve tentativa existente. IDs de origem, pontuação e respostas precisam ser preservados; dados não disponíveis devem ser omitidos, nunca adivinhados.
+
+## Notas do aluno e revisão
+
+`learnerNotes` preserva anotações textuais disponíveis da origem. `reviewRequested` é uma classificação editorial opcional: `true` pede inclusão; `false` indica que as notas não pedem revisão. Sem classificação, notas não vazias entram conservadoramente no Pre-Test Review. A ausência desses campos é compatível com tentativas antigas, sem significar que pedidos históricos foram recuperados. Veja a [seleção completa](pre-test-review.md).
