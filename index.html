@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" class="instrument-design" data-theme="graphite">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Skill Builder — certification study library</title>
 <meta name="description" content="Review mock exams, reports and Stories across certifications — installable and works offline.">
-<meta name="theme-color" content="#131109">
+<meta name="theme-color" content="#151719">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,7 +13,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
-<link rel="stylesheet" href="app.css?v=11">
+<link rel="stylesheet" href="app.css?v=33">
 </head>
 <body>
 
@@ -23,6 +23,9 @@
   <button class="appbar__link appbar__link--icon" id="openStories" title="Story cards (s)">
     <span aria-hidden="true">▶</span><span class="appbar__label">Stories</span>
   </button>
+  <button class="appbar__link appbar__link--icon" id="openGallery" title="Certification gallery" aria-label="Certification Gallery">
+    <span aria-hidden="true">▦</span><span class="appbar__label">Gallery</span>
+  </button>
   <button class="appbar__link" id="openIndex">Reports <span class="appbar__n" id="indexCount">0</span></button>
   <button class="appbar__link appbar__link--icon" id="offlineBtn" title="Save this attempt for offline stories">
     <span aria-hidden="true">⤓</span><span class="appbar__label" id="offlineLabel">Offline</span>
@@ -31,7 +34,7 @@
   <button class="iconbtn" id="themeBtn" title="Switch theme" aria-label="Switch theme">◑</button>
 </header>
 
-<div class="shell">
+<div class="shell" id="shell">
   <aside class="rail" id="rail">
     <div class="rail__head">
       <div class="railh">Attempts</div>
@@ -68,8 +71,11 @@
   <main class="main">
     <section class="study-scope" aria-label="Study content selection">
       <label>Certification<select id="certSelector" class="select"></select></label>
+      <div class="cert-archive-state" id="certArchiveState" hidden></div>
       <label>Mock exam<select id="examSelector" class="select"></select></label>
       <label>Attempt<select id="attemptSelector" class="select"></select></label>
+      <button class="btn btn--archive" id="archiveCertification" hidden>Archive certification</button>
+      <a class="material-chip pretest-link" id="openPreTestReview" href="#">Pre-Test Review</a>
       <div class="study-scope__materials" id="materialShelf"></div>
     </section>
     <div class="head" id="head"></div>
@@ -91,6 +97,36 @@
     <div id="list"></div>
   </main>
 </div>
+
+<section class="cert-gallery" id="certGallery" hidden aria-labelledby="galleryTitle">
+  <div class="cert-gallery__inner">
+    <header class="cert-gallery__hero">
+      <div>
+        <div class="cert-gallery__eyebrow">Study portfolio</div>
+        <h1 id="galleryTitle" tabindex="-1">Certification Gallery</h1>
+        <p>See the certifications you are studying and the work you have completed.</p>
+      </div>
+      <button class="btn" id="galleryBack">← Back to study</button>
+    </header>
+    <div id="galleryContent" aria-live="polite"></div>
+  </div>
+</section>
+
+<dialog class="archive-dialog" id="archiveDialog" aria-labelledby="archiveTitle">
+  <form id="archiveForm">
+    <h2 id="archiveTitle">Archive certification</h2>
+    <p id="archiveDescription"></p>
+    <fieldset>
+      <legend>How did you finish?</legend>
+      <label><input type="radio" name="archiveStatus" value="passed" required> Passed</label>
+      <label><input type="radio" name="archiveStatus" value="study-complete"> Finished studying</label>
+    </fieldset>
+    <div class="archive-dialog__actions">
+      <button class="btn" type="button" id="archiveCancel">Cancel</button>
+      <button class="btn btn--primary" type="submit">Archive</button>
+    </div>
+  </form>
+</dialog>
 
 <!-- Analysis reader: the point of the whole app, so it gets its own surface -->
 <div class="reader" id="reader" hidden aria-modal="true" role="dialog" aria-label="Analysis">
@@ -177,23 +213,40 @@
       <span class="reportview__crumb" id="reportCrumb">Full review</span>
     </a>
     <div class="reportview__actions">
+      <button class="reportview__icon pretest-save" id="reviewSaveOffline" type="button" hidden>Save offline</button>
       <button class="reportview__icon" id="reportReadBtn" type="button" aria-label="Mark as read" title="Mark as read">○</button>
       <button class="reportview__icon" id="reportPrint" type="button" aria-label="Print report" title="Print report">⎙</button>
       <button class="reportview__icon" id="reportTheme" type="button" aria-label="Switch theme" title="Switch theme">◑</button>
       <a class="reportview__icon" id="reportClose" href="#" aria-label="Close report" title="Close report">✕</a>
     </div>
   </header>
+  <div class="reportview__topicsteps" id="reviewTopicSteps" role="group" aria-label="Topic navigation" hidden>
+    <button class="reportview__icon" id="reviewTopicPrevious" type="button" aria-label="Previous topic">← Previous</button>
+    <span id="reviewTopicCount" role="status" aria-live="polite" aria-atomic="true"></span>
+    <button class="reportview__icon" id="reviewTopicNext" type="button" aria-label="Next topic">Next →</button>
+    <div class="reportview__reading" id="reviewReading" hidden>
+      <label for="reviewReadingTime">Reading time</label>
+      <select class="input" id="reviewReadingTime"><option value="10">10 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option></select>
+    </div>
+  </div>
+  <div class="reportview__topicbar" id="reportTopicHeader" hidden></div>
   <div class="reportview__scroll" id="reportScroll">
     <div class="reportview__wrap">
       <header class="reportview__hero">
         <div class="reportview__kicker" id="reportKicker">Full review</div>
         <h1 class="reportview__title" id="reportTitle" tabindex="-1"></h1>
         <dl class="reportview__meta" id="reportMeta" hidden></dl>
+        <p class="pretest-notice" id="reviewNotice" role="status" hidden></p>
       </header>
       <div class="reportview__grid" id="reportGrid">
         <aside class="reportview__aside" id="reportAside">
           <div class="reportview__asideTitle">In this review</div>
-          <nav class="reportview__toc" id="reportToc" aria-label="Report contents"></nav>
+          <details class="reportview__topics" id="reportTopics" open>
+            <summary id="reportTopicsSummary">Browse topics</summary>
+            <input class="input reportview__topicsearch" id="reportTopicSearch" type="search" placeholder="Search topics" aria-label="Search topics" hidden>
+            <nav class="reportview__toc" id="reportToc" aria-label="Report contents"></nav>
+            <p class="panel__hint" id="reportTopicEmpty" role="status" hidden>No topics match your search.</p>
+          </details>
           <a class="reportview__back" id="reportBack" href="#">← Back to the attempt</a>
         </aside>
         <article class="md md--review" id="reportContent" aria-busy="false"></article>
@@ -210,7 +263,9 @@
 <div class="toast" id="toast" role="status"></div>
 
 <script src="progress.js"></script>
-<script src="app.js?v=11"></script>
+<script src="pretest.js?v=33"></script>
+<script src="certification-status.js?v=33"></script>
+<script src="app.js?v=33"></script>
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

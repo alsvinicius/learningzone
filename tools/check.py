@@ -2,6 +2,7 @@
 """Validate the v1 content catalog, normalized attempts, Stories and PWA shell."""
 
 import json
+import argparse
 import os
 import sys
 
@@ -144,9 +145,14 @@ def check_normalized_attempt(path, attempt):
 
 
 def main():
-    index_path = os.path.join(DATA, "index.json")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--index', default=os.path.join(DATA, 'index.json'))
+    parser.add_argument('--quiet', action='store_true', help='Print only aggregate results, without private paths or error details')
+    args = parser.parse_args()
+    problems.clear()
+    index_path = args.index
     if not os.path.exists(index_path):
-        print(f"nothing at {index_path}")
+        print('Catalog index unavailable' if args.quiet else f"nothing at {index_path}")
         return 1
 
     with open(index_path, encoding="utf-8") as fh:
@@ -156,7 +162,7 @@ def main():
         try:
             from content import ContentError, validate_catalog
 
-            catalog = validate_catalog(DATA)
+            catalog = validate_catalog(DATA, index_path=index_path)
         except ContentError as err:
             fail(str(err))
             catalog = {"certifications": []}
@@ -164,7 +170,7 @@ def main():
             from tools.content import ContentError, validate_catalog
 
             try:
-                catalog = validate_catalog(DATA)
+                catalog = validate_catalog(DATA, index_path=index_path)
             except ContentError as err:
                 fail(str(err))
                 catalog = {"certifications": []}
@@ -185,10 +191,14 @@ def main():
                     score = attempt["score"]
                     percent = score.get("percent")
                     count += 1
-                    print(f"  {certification['id']}/{exam['id']}/{entry['id']}  "
-                          f"{status_counts['correct']}/{len(questions)} ({percent}%)")
+                    if not args.quiet:
+                        print(f"  {certification['id']}/{exam['id']}/{entry['id']}  "
+                              f"{status_counts['correct']}/{len(questions)} ({percent}%)")
         check_pwa()
         if problems:
+            if args.quiet:
+                print(f'Catalog check failed: {len(problems)} problem(s); inspect privately')
+                return 1
             print("\nproblems found:")
             for problem in problems:
                 print(f"  - {problem}")
@@ -198,6 +208,9 @@ def main():
 
     fail(f"{index_path}: catálogo legado não é aceito; use schemaVersion 1")
     if problems:
+        if args.quiet:
+            print(f'Catalog check failed: {len(problems)} problem(s); inspect privately')
+            return 1
         print("\nproblems found:")
         for problem in problems:
             print(f"  - {problem}")

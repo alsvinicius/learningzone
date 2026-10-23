@@ -10,6 +10,8 @@ O modo `make serve-private` seleciona um índice salvo em `.local/private-data/`
 
 A inicialização pela Project Gallery também seleciona o índice privado padrão quando ele existe. Assim, a instalação local abre a biblioteca pessoal e a distribuição sem dados continua vazia. Essa seleção pertence ao processo do servidor, não ao arquivo público nem ao armazenamento de progresso do navegador. Veja a [referência de comandos](../reference/development-commands.md) para trocar o catálogo.
 
+O arquivamento de certificações segue a mesma fronteira local. Status e data ficam em `localStorage` no dispositivo atual, enquanto a galeria calcula seus cartões a partir dos manifests existentes. Nenhum status de conclusão é escrito no catálogo versionável ou sincronizado entre navegadores.
+
 ## Limites
 
 O progresso não acompanha a pessoa entre dispositivos e pode ser removido ao limpar dados do site. Cache não equivale a backup: o navegador pode remover arquivos. Não há recuperação remota. Ao mover para outro dispositivo, conteúdo pode ser copiado por meio privado e salvo offline novamente; progresso não será transferido automaticamente.

@@ -14,16 +14,22 @@ def story():
 
 - **Domain**: 1 — Sample
 - **Task**: 1.1 — Sample
-- **Signal**: \"fixture\"
+- **Signal**: "fixture"
 
 ## Topic
-Topic body.
+The fixture asks something.
+
+**Your answer (incorrect):** The option that was chosen.
+
+**Correct answer:** The option that was keyed.
+
 ## Why you got it wrong
 Misconception body.
 ## Why the right answer was different
 Discriminator body.
 ## Concepts to nail it next time
-Reusable rule.
+- A reusable rule.
+- Another reusable rule.
 """
 
 
@@ -141,6 +147,26 @@ class ContentCatalogTests(unittest.TestCase):
         attempt["materials"][1]["questionNumber"] = 2
         write_json(path, attempt)
         with self.assertRaisesRegex(ContentError, "não corresponde a questionNumber 2"):
+            validate_catalog(self.root)
+
+    def test_rejects_story_without_task_code(self):
+        path = self.root / "cert-one/exam-one/attempts/try-1/cards/q1.md"
+        path.write_text(story().replace("1.1 — Sample", "architecture decision"), encoding="utf-8")
+        with self.assertRaisesRegex(ContentError, "código numérico oficial"):
+            validate_catalog(self.root)
+
+    def test_rejects_story_without_answer_disclosure(self):
+        path = self.root / "cert-one/exam-one/attempts/try-1/cards/q1.md"
+        path.write_text(story().replace("**Correct answer:** The option that was keyed.\n", ""),
+                        encoding="utf-8")
+        with self.assertRaisesRegex(ContentError, "Correct answer"):
+            validate_catalog(self.root)
+
+    def test_rejects_story_without_memorisation_list(self):
+        path = self.root / "cert-one/exam-one/attempts/try-1/cards/q1.md"
+        path.write_text(story().replace("- A reusable rule.\n- Another reusable rule.\n", "A rule.\n"),
+                        encoding="utf-8")
+        with self.assertRaisesRegex(ContentError, "itens de lista"):
             validate_catalog(self.root)
 
 

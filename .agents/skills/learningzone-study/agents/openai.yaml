@@ -1,0 +1,4 @@
+interface:
+  display_name: "LearningZone Study"
+  short_description: "Revise conceitos e pratique cenários dos simulados"
+  default_prompt: "Use $learningzone-study para estudar comigo a partir do Pre-Test Review e dos meus simulados."

@@ -62,3 +62,5 @@ Reporte vulnerabilidades em privado ao mantenedor do projeto, usando o canal de 
 ## Escopo de revisão
 
 Uma contribuição não deve ampliar silenciosamente o produto para um serviço multiusuário ou de hospedagem de conteúdo. Discuta primeiro mudanças que adicionem sincronização, analytics, backend, dependências de terceiros, suporte específico de fornecedor ou distribuição de bancos de questões.
+
+Ao alterar o fluxo de autoria ou os sinais de revisão, preserve a [cobertura do Pre-Test Review](docs/diataxis/reference/pre-test-review.md). Atualizações de conteúdo devem seguir o [procedimento de consolidação](docs/diataxis/how-to/update-pre-test-review.md) e validar o índice privado explicitamente, sem copiar conteúdo pessoal para testes ou logs.

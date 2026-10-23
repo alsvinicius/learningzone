@@ -143,11 +143,23 @@ def clean_text(text):
     return text.strip()
 
 
+def learner_notes(answer):
+    """Preserve textual learner annotations; never mistake option rationale for notes."""
+    parts = []
+    for key in ('learnerNotes', 'notes', 'note', 'comment', 'comments', 'userNote', 'userNotes'):
+        value = answer.get(key)
+        if isinstance(value, str) and value.strip():
+            cleaned = clean_text(value)
+            if cleaned not in parts:
+                parts.append(cleaned)
+    return '\n\n'.join(parts)
+
+
 def link_study_files(attempt, certification_id, exam_id, attempt_id):
     """Registers attempt-local reports and Stories as normalized materials.
 
-    Reports only exist for questions you got wrong, so the status has to agree
-    with the link. The card can exist for any question, since a card is the fast
+    Reports and cards can exist for any question: a correct educated guess
+    or an explicit learner note also merits study. The card is the fast
     view of one item, and reading a question you already answered is still
     useful revision.
     """
@@ -166,7 +178,7 @@ def link_study_files(attempt, certification_id, exam_id, attempt_id):
         n = q["n"]
         refs = [r for r in q.get("materials", [])
                 if not (r.get("scope") == "attempt" and str(r.get("id", "")).startswith(("report-q", "story-q")))]
-        note = notes.get(n) if q["status"] == "incorrect" else None
+        note = notes.get(n)
         if note:
             title = note_topic(os.path.join(folder, "reports", note)) or f"Report Q{n}"
             mid = f"report-q{n:02d}"
@@ -292,6 +304,9 @@ def build(raw, attempt_id, certification_id, exam_id, certification_code=None):
                 "confidence": answer.get("confidenceLevel"),
                 "seconds": answer.get("timeSpentInSeconds"),
                 "flagged": bool(answer.get("isFlagged")),
+                **({"learnerNotes": learner_notes(answer)} if learner_notes(answer) else {}),
+                **({"reviewRequested": answer['reviewRequested']}
+                   if isinstance(answer.get('reviewRequested'), bool) else {}),
             }
         )
 

@@ -1,6 +1,6 @@
 # Como escrever um cartão Stories
 
-Crie Markdown para uma questão, declare-o como material `story` e ligue-o à questão pelo ID.
+Crie Markdown para uma questão, declare-o como material `story` e ligue-o à questão pelo ID. Um Story é uma lição autônoma de quatro ecrãs: ele não resume um relatório e não depende dele.
 
 ## Criar o arquivo
 
@@ -11,7 +11,40 @@ Use `cards/qNN.md` na pasta compartilhada do simulado ou da tentativa. Comece co
 3. `## Why the right answer was different`
 4. `## Concepts to nail it next time`
 
-Escreva texto original e conciso; não inclua gabaritos protegidos ou material que não possa ser redistribuído.
+`Domain` e `Task` começam pelo código numérico oficial, por exemplo `1.5 — Design retrieval mechanisms for FM augmentation`. O `Signal` é um trecho curto do enunciado que entrega a resposta.
+
+### Ecrã 1 — contexto, sua resposta, resposta correta
+
+Reconstrua o caso em duas a quatro frases, sem depender do enunciado original, e declare as duas respostas:
+
+```markdown
+## Topic
+
+<contexto do caso, com a exigência que decide o item>
+
+**Your answer (incorrect):** <paráfrase fiel da opção escolhida>
+**Correct answer:** <paráfrase fiel da opção gabaritada>
+```
+
+A paráfrase nomeia todos os serviços e mecanismos da opção, para que o cartão seja comparável com o enunciado, sem copiar o texto da fonte. Em multi-seleção, liste cada alternativa numa linha marcada com ✓ ou ✗.
+
+### Ecrã 2 — o que você errou
+
+Explique o erro inteiro, com o nome do raciocínio que falhou e o motivo de a falha. Use lista quando o erro tem partes distintas.
+
+Para resposta correta, não invente um erro: diga que a resposta estava certa, explique o mecanismo e consolide a dúvida que ficou registrada.
+
+### Ecrã 3 — por que o gabarito está certo
+
+Mapeie cada exigência do enunciado ao mecanismo que a satisfaz e explique por que a alternativa mais tentadora falha. Nomeie as responsabilidades concretas dos serviços.
+
+### Ecrã 4 — o que memorizar
+
+Liste de memorização: no mínimo dois itens, com regras, distinções e gatilhos de escolha. Use uma tabela quando o contraste couber em pares curtos. Termine com a frase que resume a regra:
+
+```markdown
+- The sentence to keep: **<a regra em uma frase>**
+```
 
 ## Declarar e relacionar
 
@@ -19,4 +52,4 @@ No `exam.json` ou `attempt.json` proprietário, inclua `id`, `type: "story"`, `t
 
 ## Validar
 
-Execute `make check`. A validação verifica seções, ordem, corpo, H1, metadados, número e arquivo. Depois, abra Stories e confira o destino da questão.
+Execute `make check`. A validação verifica seções, ordem, corpo, H1, metadados, código de Domain e Task, a declaração das duas respostas no ecrã `Topic`, os itens de lista da secção de conceitos e o arquivo. Depois, abra Stories e confira o destino da questão.

@@ -131,6 +131,22 @@ def _validate_story(path: Path, question_number=None):
     missing = {"Domain", "Task", "Signal"} - metadata
     if missing:
         raise ContentError(f"{path}: metadados Story ausentes: {', '.join(sorted(missing))}")
+    for label in ("Domain", "Task"):
+        value = re.search(r"^\s*[-*]\s+\*\*%s\*\*\s*:\s*(.+)$" % label, text, re.MULTILINE)
+        if value and not re.match(r"^\d", value.group(1).strip()):
+            raise ContentError(
+                f"{path}: {label} deve começar pelo código numérico oficial; "
+                f"encontrado {value.group(1).strip()!r}")
+    topic = parts[0]
+    for label in ("Your answer", "Correct answer"):
+        if not re.search(r"\*\*%s\b" % label, topic):
+            raise ContentError(
+                f"{path}: a secção Topic deve declarar '**{label}**' com a resposta do aluno "
+                f"e a resposta gabaritada")
+    concepts = parts[-1]
+    if not re.search(r"^\s*[-*]\s+\S", concepts, re.MULTILINE):
+        raise ContentError(
+            f"{path}: a secção 'Concepts to nail it next time' precisa de itens de lista para memorização")
 
 
 def _validate_attempt(attempt_path: Path, certification_id: str, exam_id: str, attempt_id: str,
@@ -153,6 +169,10 @@ def _validate_attempt(attempt_path: Path, certification_id: str, exam_id: str, a
         if not isinstance(n, int) or isinstance(n, bool) or n < 1:
             raise ContentError(f"{attempt_path}: questions[{i}].n deve ser inteiro positivo")
         qnums.append(n)
+        if 'learnerNotes' in q and not isinstance(q['learnerNotes'], str):
+            raise ContentError('learnerNotes deve ser texto')
+        if 'reviewRequested' in q and not isinstance(q['reviewRequested'], bool):
+            raise ContentError('reviewRequested deve ser booleano')
         refs = _array(q.get("materials", []), attempt_path, f"questions[{i}].materials")
         seen = set()
         for ri, refraw in enumerate(refs):
@@ -177,10 +197,10 @@ def _validate_attempt(attempt_path: Path, certification_id: str, exam_id: str, a
     return attempt
 
 
-def validate_catalog(data_dir: str | Path) -> dict:
+def validate_catalog(data_dir: str | Path, *, index_path: str | Path | None = None) -> dict:
     """Validate the complete catalog and return the parsed index."""
     root = Path(data_dir).resolve()
-    index_path = root / "index.json"
+    index_path = Path(index_path).resolve() if index_path is not None else root / "index.json"
     index = _object(_read_json(index_path), index_path, "catálogo")
     if index.get("schemaVersion") != 1:
         raise ContentError(f"{index_path}: schemaVersion deve ser 1")
@@ -219,6 +239,15 @@ def validate_catalog(data_dir: str | Path) -> dict:
                 _validate_attempt(attempt_path, cid, eid, aid, exam_materials)
             _unique(attempt_ids, index_path, f"IDs de tentativa em {cid}/{eid}")
         _unique(exam_ids, index_path, f"IDs de simulado em {cid}")
+        if cert.get('preTestReview') is not None:
+            try:
+                try:
+                    from pretest import validate_review, ReviewError
+                except ImportError:
+                    from tools.pretest import validate_review, ReviewError
+                validate_review(root, cert)
+            except (ReviewError, ValueError, OSError, KeyError, TypeError) as exc:
+                raise ContentError('Pre-Test Review inválido, incompleto ou desatualizado') from exc
     _unique(cert_ids, index_path, "ID de certificação")
     return index
 

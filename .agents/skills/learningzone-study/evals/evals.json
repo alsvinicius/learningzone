@@ -1,0 +1,123 @@
+{
+  "skill_name": "learningzone-study",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "No Skill Builder, abra somente os arquivos sintéticos em tests/fixtures/pretest/. A certificação escolhida é sample-cert. Quero o modo Com minhas palavras. Minha explicação enviada é: ‘Connection timeout e request deadline são a mesma coisa; qualquer falha pode ser resolvida repetindo a operação até dar certo, inclusive escrita.’ Avalie o que eu disse com base somente na evidência disponível. Não acesse .local/private-data.",
+      "expected_output": "Avaliação em português que separa afirmações corretas/incorretas, aponta condições decisivas e risco de repetir escrita, reconhece limites da evidência e não inventa texto da questão original. Feedback conciso que não confunde repetição da correção com domínio.",
+      "files": [],
+      "expectations": [
+        "Dá um veredito explícito de compreensão parcial ou incorreta, sem elogiar como correto.",
+        "Distingue limite da operação inteira (request deadline) do tempo de estabelecimento da conexão (connection timeout).",
+        "Sinaliza risco de repetir efeitos de uma escrita sem segurança de idempotência, sem afirmar que todo retry é sempre errado.",
+        "Não atribui ao aluno um histórico ou enunciado da questão que os fixtures não registram."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "No Skill Builder, use só tests/fixtures/pretest/ e a certificação sintética sample-cert. Já escolhi Cenários dos meus erros, idioma PT-BR e nível Nível de certificação. Crie uma questão original de escolha única com cinco alternativas A–E, a partir de uma dificuldade elegível; não reutilize texto, contexto nem estrutura do simulado e mostre apenas a questão para eu responder. Pare e aguarde. Não acesse .local/private-data.",
+      "expected_output": "Uma questão original de escolha única com exatamente cinco alternativas A–E, contexto diferente, sem revelar a resposta; após a resposta, feedback que explica a opção certa, as pegadinhas e a relação verificável com a questão de origem, sem reconstruir detalhes ausentes.",
+      "files": [],
+      "expectations": [
+        "Apresenta um cenário novo com cinco alternativas A–E e pede exatamente uma resposta.",
+        "Muda contexto e estrutura; não é só paráfrase superficial da questão original.",
+        "Não revela a resposta correta nem explica o mecanismo-chave antes da resposta.",
+        "Depois da resposta, explica a escolha e relaciona ao simulado sem inventar detalhes ausentes."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Use somente tests/fixtures/pretest/ (certificação sintética sample-cert). Já escolhi o modo Com minhas palavras e quero começar pelo primeiro tópico, em sequência. Mostre o título e número atual/total e convide-me a explicar o que entendi, sem resumir antes o conteúdo. Não acesse .local/private-data.",
+      "expected_output": "Uma única solicitação de explicação para o primeiro heading do índice visível, contando Last-minute priorities como tópico se o leitor a contar, com ordinal correto e sem entregar o conteúdo antes da resposta.",
+      "files": [],
+      "expectations": [
+        "Conta a seção Last-minute priorities como tópico 1 e informa o total correto de headings navegáveis do fixture.",
+        "Convida o aluno a explicar o que entendeu sem fornecer resumo ou lista de gabarito antes da resposta.",
+        "Faz apenas uma pergunta/convite e aguarda, sem iniciar outro tópico automaticamente.",
+        "Distingue prioridade/síntese de conceito isolado, se o nome ou contexto exigir."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "No Skill Builder, use só tests/fixtures/pretest/ e sample-cert sintético. Já escolhi Cenários dos meus erros, idioma PT-BR e nível Nível de certificação. Crie uma questão nova de interpretação de timeouts em um agregador de verificações de saúde somente de leitura; peça “Selecione DUAS” e ofereça cinco alternativas A–E. Não use escrita, resposta perdida ou duplicidade/retry: quero praticar outro aspecto do conceito em contexto e estrutura diferentes do simulado. Apresente só a questão e espere minha resposta. Não acesse .local/private-data.",
+      "expected_output": "Questão nova de seleção múltipla sobre limites de timeout numa operação de leitura, pede DUAS escolhas, tem cinco alternativas A–E e exatamente duas corretas sustentadas pela revisão, além de distratores plausíveis. Não recicla o dilema de escrita/retry ou a sequência da questão original. Após a resposta, compara apenas o princípio comum e explicita as diferenças.",
+      "files": [],
+      "expectations": [
+        "Indica claramente Selecione DUAS e oferece exatamente cinco opções rotuladas de A a E.",
+        "Exatamente duas opções descrevem corretamente os escopos de connection timeout e request deadline segundo o fixture.",
+        "O item usa apenas leitura e muda a decisão/situação; não repete o ciclo de escrita, resposta perdida e retry.",
+        "Aguarda sem revelar o gabarito e, no feedback, compara o princípio com a origem sem inventar detalhes ausentes."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "No Skill Builder, use somente os fixtures sintéticos tests/fixtures/pretest e sample-cert. Já escolhi Cenários dos meus erros, idioma PT-BR e nível Nível de certificação. Crie uma questão nova baseada em uma dificuldade registrada, em formato compatível com a prova. Não indique o gabarito e pare para eu responder. Não acesse .local/private-data.",
+      "expected_output": "Sem pedir modalidade, apresenta uma questão em formato de prova válido: escolha única com cinco alternativas A–E, Selecione DUAS com cinco A–E, ou Selecione TRÊS com seis A–F. Aguarda sem revelar gabarito e usa contexto original.",
+      "files": [],
+      "expectations": [
+        "Escolhe uma modalidade de resposta de prova sem voltar a pergunta aberta.",
+        "Aplica uma combinação válida entre tipo de seleção, quantidade de respostas corretas e número de alternativas; nunca gera apenas quatro opções.",
+        "Cria contexto diferente, sem revelar gabarito, e espera a resposta."
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "No Skill Builder use só o fixture sintético sample-cert. Esta certificação é aplicada somente em inglês. Quero iniciar Cenários dos meus erros, ainda não escolhi idioma nem dificuldade. Antes de me dar a primeira questão, pergunte minhas preferências e espere.",
+      "expected_output": "Uma única mensagem curta pergunta PT-BR ou English (mencionando English como idioma original da prova) e Conceitual, Nível de certificação ou Acima da certificação com descrições breves. Não começa o exercício até a resposta.",
+      "files": [],
+      "expectations": [
+        "Pergunta explicitamente se o aluno prefere PT-BR ou English e informa que English é a língua da prova.",
+        "Pergunta explicitamente o nível com as três opções e distingue seus significados.",
+        "Não apresenta cenário, explicação ou gabarito antes de receber as duas escolhas."
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "Use somente o fixture sintético sample-cert. Quero iniciar Cenários dos meus erros em PT-BR e nível Conceitual. Faça a primeira questão agora.",
+      "expected_output": "Não volta a perguntar idioma nem dificuldade, e gera um cenário simples no nível pedido, em PT-BR, com formato da prova e aguarda a resposta.",
+      "files": [],
+      "expectations": [
+        "Respeita PT-BR e não pergunta novamente o idioma.",
+        "Respeita o nível conceitual e não introduz complexidade avançada sem necessidade.",
+        "Apresenta uma questão com cinco alternativas A–E, ou seis A–F se pedir para selecionar três, e aguarda a resposta."
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "Use somente o fixture sintético sample-cert. Quero iniciar Cenários dos meus erros em English, no nível Nível de certificação. Faça a primeira questão agora.",
+      "expected_output": "Sem perguntar novamente idioma ou nível, apresenta em inglês uma questão original com profundidade e distratores realistas para prova, em formato de escolha única ou múltiplas respostas; não revela a resposta e aguarda.",
+      "files": [],
+      "expectations": [
+        "Usa inglês no enunciado, alternativas, instruções e feedback/instrução de resposta.",
+        "Não pergunta novamente as preferências informadas.",
+        "O cenário e distratores têm dificuldade realista de certificação, sem complexidade de nível acima da prova sem motivo.",
+        "Usa um formato válido: escolha única/A–E, Selecione DUAS/A–E ou Selecione TRÊS/A–F; aguarda sem revelar gabarito."
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "Use somente o fixture sintético sample-cert. Quero iniciar Cenários dos meus erros em PT-BR, no nível Acima da certificação. Faça a primeira questão agora.",
+      "expected_output": "Sem perguntar novamente preferências, apresenta em PT-BR uma questão original que integra conceitos ou explora um caso-limite mais difícil que o esperado na prova, em formato de seleção; identifica quais requisitos/detalhes estão além do escopo típico, não os classifica como obrigatórios para passar e aguarda sem revelar gabarito.",
+      "files": [],
+      "expectations": [
+        "Respeita PT-BR e não pergunta novamente idioma nem nível.",
+        "A questão realmente exige integração de conceitos ou julgamento em caso-limite acima da prova, em vez de apenas rotular uma questão simples como avançada.",
+        "Sinaliza o que excede o escopo esperado e separa isso do conhecimento normalmente exigido para passar.",
+        "Usa questão de escolha única/A–E, Selecione DUAS/A–E ou Selecione TRÊS/A–F e aguarda sem revelar gabarito."
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Use somente os fixtures sintéticos tests/fixtures/pretest e sample-cert. Já escolhi Cenários dos meus erros, idioma English e nível Nível de certificação. Crie um item original com formato ‘Select THREE’. A questão deve ter três respostas corretas e seis alternativas A–F, com cenário novo. Mostre apenas o item, não revele as corretas e espere minha resposta. Não acesse .local/private-data.",
+      "expected_output": "Uma questão inédita em inglês de múltiplas respostas com exatamente seis opções A–F e instrução para selecionar TRÊS; exatamente três opções são corretas segundo a evidência, sem gabarito antecipado.",
+      "files": [],
+      "expectations": [
+        "Instrui claramente a selecionar TRÊS respostas.",
+        "Usa inglês de forma consistente, conforme a escolha do aluno.",
+        "Apresenta exatamente seis alternativas rotuladas A–F.",
+        "Exatamente três respostas são sustentadas pelas evidências e as demais são distratores descartáveis sob as condições dadas.",
+        "Aguarda a resposta sem revelar o gabarito."
+      ]
+    }
+  ]
+}

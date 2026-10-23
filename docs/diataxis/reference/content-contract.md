@@ -48,7 +48,7 @@ Uma questão tem `n` inteiro positivo e pode conter `materials`, uma lista de re
 
 ## Materiais e Stories
 
-IDs de material são únicos dentro do manifesto proprietário. Cada caminho precisa existir e permanecer dentro da pasta do manifesto. O tipo `story` precisa seguir [Formato Stories](story-card-format.md). Materiais sem referência em questão continuam acessíveis na biblioteca.
+IDs de material são únicos dentro do manifesto proprietário. Cada caminho precisa existir e permanecer dentro da pasta do manifesto. O tipo `story` precisa seguir [Formato Stories](story-card-format.md), que define as quatro seções obrigatórias, o conteúdo de cada uma e a declaração das duas respostas no ecrã `Topic`. Materiais sem referência em questão continuam acessíveis na biblioteca.
 
 ## Regras de validação
 
@@ -60,3 +60,7 @@ IDs de material são únicos dentro do manifesto proprietário. Cada caminho pre
 - O verificador confere consistência de totais, respostas e score.
 
 Para criar conteúdo, siga o [guia de autoria](../how-to/add-study-content.md). Para privacidade, consulte [Conteúdo e licenças](../explanation/content-and-licensing.md).
+
+## Revisão por certificação
+
+A extensão opcional `preTestReview` declara uma revisão consolidada em nível de certificação, sem alterar a hierarquia dos simulados. Campos, cobertura, fingerprints e compatibilidade estão na [referência Pre-Test Review](pre-test-review.md). Questões podem preservar `learnerNotes` (texto) e `reviewRequested` (booleano editorial).

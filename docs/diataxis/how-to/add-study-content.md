@@ -35,6 +35,10 @@ O app consome um formato comum. Um conversor local por fonte deve mapear resulta
 
 Mantenha exportações originais fora do Git. Execute conversores sobre arquivos locais temporários e apague o bruto quando a saída for conferida.
 
+## Atribuir domínio e tarefa
+
+O `Domain` e o `Task` de um Story usam os códigos e nomes oficiais do blueprint. Quando a origem publica apenas os totais por domínio e por tarefa, sem dizer a qual questão cada um pertence, a atribuição por questão é uma reconstrução editorial. Reconstrua-a e confira: a atribuição é aceitável quando reproduz exatamente as contagens oficiais de questões e de acertos em cada tarefa e em cada domínio. Registre no README da tentativa que a atribuição é editorial, para que ninguém a leia como dado da origem.
+
 ## Validar e revisar
 
 ```bash
@@ -44,4 +48,8 @@ make serve
 
 Confira contagens, respostas, score e agregados com a origem. Na interface, abra uma tentativa, um material compartilhado, um específico e Stories associados. Para simulado sem tentativa, confirme que material compartilhado permanece disponível.
 
+Um Story é uma lição autônoma: leia os quatro ecrãs de um cartão sem abrir o relatório e confirme que o contexto, a resposta dada, a resposta gabaritada, o erro, o mecanismo e a lista de memorização estão todos no cartão. Consulte [Formato Stories](../reference/story-card-format.md) e [Escrever cartões Stories](write-story-card.md).
+
 Antes de abrir uma contribuição de código, restaure `data/index.json` para `{"schemaVersion":1,"certifications":[]}`. Não use `git add -f` em conteúdo local. Veja [privacidade e licenças](../explanation/content-and-licensing.md).
+
+A entrega inclui [preparar ou atualizar o Pre-Test Review](update-pre-test-review.md), consolidando todas as tentativas da certificação. Consulte a [referência](../reference/pre-test-review.md) para seleção e cobertura.

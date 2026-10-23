@@ -19,6 +19,18 @@ Este arquivo é a instrução operacional para agentes que modificam o Skill Bui
 
 Leia a referência pertinente antes de mudar comportamento. Se código e documentação divergirem, verifique o comportamento implementado, corrija a fonte autoritativa e reconcilie as páginas afetadas na mesma tarefa.
 
+## Stories: lição autônoma, não resumo
+
+Um Story é material de estudo, não um extrato de relatório. Quem abre o cartão entende a situação, a decisão, o motivo do erro e o que memorizar sem sair da tela.
+
+- As quatro secções são tokens do contrato, nesta ordem: `Topic`, `Why you got it wrong`, `Why the right answer was different`, `Concepts to nail it next time`. O formato está em [story-card-format.md](docs/diataxis/reference/story-card-format.md).
+- `Domain` e `Task` começam pelo código numérico oficial. Quando a origem só publica agregados, a atribuição por questão é uma reconstrução editorial: aceite-a quando ela reproduz as contagens oficiais por tarefa e por domínio, e registre isso no README da tentativa.
+- O ecrã `Topic` declara `**Your answer**` e `**Correct answer**` em paráfrase fiel, nomeando todos os mecanismos da opção. Não copie o enunciado nem as alternativas da origem.
+- `Why you got it wrong` explica o erro inteiro. Para resposta correta, não invente erro: explique o que estava certo e consolide a dúvida registrada.
+- `Why the right answer was different` mapeia cada exigência ao mecanismo e derruba a alternativa mais tentadora.
+- `Concepts to nail it next time` é lista de memorização com itens de lista e termina em "The sentence to keep:".
+- Um Story não remete a um relatório, a um comentário ou a uma "fonte" como se o leitor os tivesse. Quem o escreve pode usar o relatório; quem o lê não precisa dele.
+
 ## Privacidade: regra obrigatória
 
 - `data/index.json` é o único arquivo versionável sob `data/` e começa com `certifications: []`.
@@ -50,6 +62,8 @@ Para a execução local gerenciada pela Project Gallery, use `make start` e `mak
 
 Isso roda os testes Python, testes Node e o verificador do catálogo/PWA. Para revisar visualmente, rode `make serve` e abra `http://localhost:8000/`. Não deixe processos que você iniciou rodando após a revisão.
 
+Ao alterar navegação, valide com Playwright o caminho desde a página inicial pelo controle visível, além da rota direta e da recarga. Confira desktop e celular com clique real ou teclado, sem usar `force` para contornar controles obstruídos. Para funcionalidades que dependem de APIs restritas a contexto seguro, confira também HTTP fora de localhost e explicite os recursos indisponíveis.
+
 Atualize a documentação Diátaxis correspondente:
 
 - aprendizado inicial → `tutorials/`;
@@ -62,3 +76,15 @@ Mantenha `README.md`, `CONTRIBUTING.md`, `AGENTS.md` e os índices coerentes. Ev
 ## Fechamento de tarefa
 
 Informe o comportamento alterado, arquivos principais, comando executado e resultado. Declare validações não executadas e limitações relevantes. Não afirme que um commit, publicação ou deploy ocorreu sem evidência explícita.
+
+## Pre-Test Review: atualização obrigatória
+
+- Ao adicionar ou alterar tentativas, notas, Reports ou Stories, reconcilie o Pre-Test Review de toda a certificação antes de concluir a entrega de conteúdo. Siga o [procedimento](docs/diataxis/how-to/update-pre-test-review.md) e o [contrato autoritativo](docs/diataxis/reference/pre-test-review.md).
+- Inclua todos os sinais de erro/dúvida e pedidos nas notas, inclusive em acertos; mantenha aprendizados antigos e consolide por conceito. Escreva em inglês, em bullets autônomos, com prioridades, condições, estratégias e pegadinhas.
+- Faça revisão semântica de cada questão elegível. Não apresente extração automática, fingerprints ou cobertura estrutural como prova de correção editorial. Registre pendências e notas irrecuperáveis sem inventar conteúdo.
+- Só atualize o snapshot após reconciliar a síntese. Valide explicitamente o catálogo privado, sem imprimir conteúdo pessoal; `make check` com índice público vazio não valida materiais privados.
+
+## Product workflow
+
+- Requisitos, jornadas e decisões: [Pre-Test Review](docs/product/pre-test-review.md). Estado e plano: [workflow-state](docs/product/workflow-state.md).
+- Antes de modificar a funcionalidade, leia as tarefas e fontes vinculadas. Atualize os artefatos e a documentação afetada quando o comportamento ou os requisitos mudarem.

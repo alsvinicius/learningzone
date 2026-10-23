@@ -1,0 +1,9 @@
+{
+  "answer": {
+    "notes": "Review operation deadlines.",
+    "comment": "Review operation deadlines.",
+    "userNote": "Explain safe retries.",
+    "rationale": "This is provider rationale, not learner commentary."
+  },
+  "expected": "Review operation deadlines.\n\nExplain safe retries."
+}

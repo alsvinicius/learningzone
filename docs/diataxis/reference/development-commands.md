@@ -24,3 +24,12 @@ Python 3.10+ é necessário para ferramentas e testes; Node.js 18+ é usado pelo
 Quando `.project-gallery.mk` existe, `WEB_PORT` deve ser definido nesse arquivo, com atribuição comum ou `override`, e não pode estar vazio. A atribuição `override export` gerada pela Gallery é aceita e preservada; não é necessário omitir a configuração para executar os comandos. Sem o arquivo gerado, o padrão local é 8000. `PORT` permite escolher outra porta para `make serve`, mas `make start` e `make stop` usam sempre `WEB_PORT`.
 
 No início gerenciado, `PRIVATE_INDEX_PATH` explícito tem precedência. Sem essa opção, a presença de `.local/private-data/index.personal.json` seleciona o catálogo privado; sua ausência mantém a distribuição vazia. A escolha ocorre quando o processo é iniciado. Para trocar o catálogo de um servidor já ativo, execute `make stop` antes de `make start`. O índice público no disco permanece inalterado.
+
+## Verificar revisões privadas
+
+- `python3 tools/pretest.py --index .local/private-data/index.personal.json`: verifica integridade, cobertura e atualização das revisões declaradas, com saída agregada sem conteúdo pessoal. Use `--data-dir` quando a raiz dos materiais não for `data/`.
+- `python3 tools/pretest.py --index .local/private-data/index.personal.json --snapshot-out .local/pretest-inputs.json`: grava entradas para a autoria em arquivo privado; não gera a síntese nem substitui a conferência editorial.
+
+O catálogo público vazio não exercita conteúdo privado em `make check`. Valide o índice escolhido explicitamente como parte da entrega de conteúdo.
+
+`python3 tools/check.py --index .local/private-data/index.personal.json --quiet` valida o catálogo privado completo, resultados normalizados e PWA sem imprimir IDs, resultados individuais ou detalhes de conteúdo em erros.

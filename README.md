@@ -56,3 +56,5 @@ Antes de criar um commit ou release público, execute `make check-public`. O com
 ## Licença e conteúdo
 
 O código está sob a licença MIT; consulte [LICENSE](LICENSE). A licença do código não concede direitos sobre questões, cursos, marcas, imagens ou materiais que cada pessoa adicionar localmente. A pessoa que cria ou distribui conteúdo deve verificar sua licença e origem. Consulte [Política de conteúdo](docs/diataxis/explanation/content-and-licensing.md).
+
+Cada certificação também pode ter um **Pre-Test Review**: revisão local em inglês, com prioridades e bullets por conceito, consolidando erros e dúvidas de todas as tentativas. O agente prepara e atualiza o conteúdo durante a autoria; a página verifica cobertura e atualização e permite salvar a revisão inteira offline. Consulte o [contrato](docs/diataxis/reference/pre-test-review.md) e o [procedimento](docs/diataxis/how-to/update-pre-test-review.md).
