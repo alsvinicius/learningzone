@@ -19,3 +19,7 @@ Ao mudar de forma incompatível a organização dos caches, incremente seu ident
 ## Revisão da certificação
 
 O Pre-Test Review verifica entradas atuais e salva seu manifesto e texto como uma única entrada em `sb-pretest-bundles-v1`. Esse cache é preservado na ativação do worker. A leitura com `cache: no-store` passa diretamente à rede local, e o próprio leitor trata a cópia salva, sem misturar versões. **Save offline** da revisão independe do botão Offline da tentativa. Consulte [integridade e limites](pre-test-review.md#offline).
+
+## Reports de estudo
+
+Salvar uma trilha inclui as lições `report` declaradas no manifesto. A leitura permanece online em HTTP fora de localhost; o controle de salvamento informa indisponibilidade quando faltam contexto seguro, service worker ou Cache API. As referências externas não são espelhadas pelo app. Veja [Reports de estudo](study-reports.md#offline).

@@ -169,6 +169,165 @@ class ContentCatalogTests(unittest.TestCase):
         with self.assertRaisesRegex(ContentError, "itens de lista"):
             validate_catalog(self.root)
 
+    def test_accepts_optional_study_catalog_with_domains_and_lessons(self):
+        study_dir = self.root / "sample-study"
+        study_dir.mkdir()
+        (study_dir / "lesson.md").write_text("# Synthetic lesson\n", encoding="utf-8")
+        (study_dir / "story.md").write_text("""# Story — Synthetic decision
+
+- **Story mode**: learning
+- **Domain**: backend — Backend
+- **Task**: Capacity choice
+- **Signal**: The database pool is saturated.
+
+## Topic
+
+**Initial model:** Add unbounded workers.\n**Improved model:** Bound concurrency and shed load.
+
+## Where the initial model breaks
+
+Unbounded workers increase contention.
+
+## A more complete model
+
+Admission control protects the dependency.
+
+## Concepts to nail it next time
+
+- Bound work in flight.
+- The sentence to keep: **Protect the bottleneck.**
+""", encoding="utf-8")
+        write_json(study_dir / "study.json", {
+            "schemaVersion": 1, "id": "sample-study", "title": "Synthetic study",
+            "domains": [{"id": "backend", "name": "Backend"}],
+            "modules": [{"id": "capacity", "title": "Capacity", "domainId": "backend", "lessons": [
+                {"id": "deep-dive", "title": "Deep dive", "type": "deep-dive", "path": "lesson.md"},
+                {"id": "story", "title": "Story", "type": "story", "path": "story.md"},
+            ]}],
+        })
+        index_path = self.root / "index.json"
+        index = json.loads(index_path.read_text())
+        index["studies"] = [{"id": "sample-study", "path": "sample-study/study.json"}]
+        write_json(index_path, index)
+        catalog = validate_catalog(self.root)
+        self.assertEqual(catalog["studies"][0]["id"], "sample-study")
+        second_story = study_dir / "story-2.md"
+        second_story.write_text((study_dir / "story.md").read_text().replace(
+            "Synthetic decision", "Synthetic second decision"), encoding="utf-8")
+        study = json.loads((study_dir / "study.json").read_text())
+        study["modules"][0]["lessons"].append({
+            "id": "story-2", "title": "Second story", "type": "story", "path": "story-2.md",
+        })
+        write_json(study_dir / "study.json", study)
+        validate_catalog(self.root)
+        self.assertEqual(len(study["modules"][0]["lessons"]), 3)
+        story_path = study_dir / "story.md"
+        story_text = story_path.read_text(encoding="utf-8")
+        story_path.write_text(story_text.replace(
+            "- The sentence to keep: **Protect the bottleneck.**",
+            "- Protect the bottleneck.",
+        ), encoding="utf-8")
+        with self.assertRaisesRegex(ContentError, "deve terminar com 'The sentence to keep:'"):
+            validate_catalog(self.root)
+
+    def test_rejects_study_story_without_domain_metadata(self):
+        study_dir = self.root / "sample-study"
+        study_dir.mkdir()
+        (study_dir / "story.md").write_text("""# Story — Synthetic decision
+
+- **Task**: Capacity choice
+- **Signal**: The database pool is saturated.
+
+## Topic
+
+**Your answer:** Add workers.\n**Correct answer:** Bound concurrency.
+
+## Why you got it wrong
+
+An explanation.
+
+## Why the right answer was different
+
+An explanation.
+
+## Concepts to nail it next time
+
+- Bound work in flight.
+- The sentence to keep: **Protect the bottleneck.**
+""", encoding="utf-8")
+        write_json(study_dir / "study.json", {
+            "schemaVersion": 1, "id": "sample-study", "title": "Synthetic study",
+            "domains": [{"id": "backend", "name": "Backend"}],
+            "modules": [{"id": "capacity", "title": "Capacity", "domainId": "backend", "lessons": [
+                {"id": "story", "title": "Story", "type": "story", "path": "story.md"},
+            ]}],
+        })
+        write_json(self.root / "index.json", {"schemaVersion": 1, "certifications": [], "studies": [
+            {"id": "sample-study", "path": "sample-study/study.json"},
+        ]})
+        with self.assertRaisesRegex(ContentError, "metadado Story ausente ou vazio: Domain"):
+            validate_catalog(self.root)
+
+    def test_accepts_study_only_catalog_and_domainless_legacy_catalog(self):
+        study_dir = self.root / "study-only"
+        study_dir.mkdir()
+        (study_dir / "lesson.md").write_text("# Lesson\n", encoding="utf-8")
+        write_json(study_dir / "study.json", {
+            "schemaVersion": 1, "id": "study-only", "title": "Only study",
+            "domains": [{"id": "backend", "name": "Backend"}],
+            "modules": [{"id": "module-one", "title": "Module", "domainId": "backend", "lessons": [
+                {"id": "lesson-one", "title": "Lesson", "type": "case", "path": "lesson.md"},
+            ]}],
+        })
+        write_json(self.root / "index.json", {"schemaVersion": 1, "certifications": [], "studies": [
+            {"id": "study-only", "path": "study-only/study.json"},
+        ]})
+        self.assertEqual(len(validate_catalog(self.root)["certifications"]), 0)
+
+    def test_accepts_study_report_without_question_or_attempt(self):
+        self.test_accepts_study_only_catalog_and_domainless_legacy_catalog()
+        path = self.root / "study-only" / "study.json"
+        study = json.loads(path.read_text())
+        study["modules"][0]["lessons"][0]["type"] = "report"
+        write_json(path, study)
+        validate_catalog(self.root)
+        study["modules"][0]["lessons"][0]["path"] = "../cert-one/exam-one/shared/guide.md"
+        write_json(path, study)
+        with self.assertRaises(ContentError):
+            validate_catalog(self.root)
+
+    def test_rejects_unknown_study_domain_and_traversing_lesson_path(self):
+        study_dir = self.root / "invalid-study"
+        study_dir.mkdir()
+        write_json(study_dir / "study.json", {
+            "schemaVersion": 1, "id": "invalid-study", "title": "Invalid",
+            "domains": [{"id": "backend", "name": "Backend"}],
+            "modules": [{"id": "module-one", "title": "Module", "domainId": "missing", "lessons": [
+                {"id": "lesson-one", "title": "Lesson", "type": "case", "path": "../outside.md"},
+            ]}],
+        })
+        write_json(self.root / "index.json", {"schemaVersion": 1, "certifications": [], "studies": [
+            {"id": "invalid-study", "path": "invalid-study/study.json"},
+        ]})
+        with self.assertRaisesRegex(ContentError, "domínio inexistente"):
+            validate_catalog(self.root)
+
+    def test_validates_explicit_certification_domain_associations(self):
+        index_path = self.root / "index.json"
+        index = json.loads(index_path.read_text())
+        cert = index["certifications"][0]
+        cert["domains"] = [{"id": "backend", "name": "Backend"}]
+        write_json(index_path, index)
+        attempt_path = self.root / "cert-one/exam-one/attempts/try-1/attempt.json"
+        attempt = json.loads(attempt_path.read_text())
+        attempt["questions"][0]["domainId"] = "backend"
+        write_json(attempt_path, attempt)
+        validate_catalog(self.root)
+        attempt["questions"][0]["domainId"] = "unknown"
+        write_json(attempt_path, attempt)
+        with self.assertRaisesRegex(ContentError, "domainId referencia domínio inexistente"):
+            validate_catalog(self.root)
+
 
 if __name__ == "__main__":
     unittest.main()

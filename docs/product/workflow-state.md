@@ -1,6 +1,6 @@
 # Estado — Pre-Test Review
 
-Revisão: 7 · Etapa: /mvp concluída · Histórico: [registro](../revision-history.md#pre-test-review).
+Revisão: 13 · Etapa: /mvp concluída · Histórico: [registro](../revision-history.md#pre-test-review).
 
 - Escopo aprovado: [requisitos, jornadas e decisões](pre-test-review.md), revisão 6.
 - Plano concluído: [implementação](../planning/pre-test-review.md), revisão 7; TASK-001–007 concluídas.
@@ -21,3 +21,10 @@ Revisão: 7 · Etapa: /mvp concluída · Histórico: [registro](../revision-hist
 - Active change: TASK-008, requested 2026-10-21. Three reading documents and selector implemented; source review preserved, shorter selections labelled, all documents saved atomically. Unit/public/private structural checks passed; browser verification passed. Reference and how-to reconciled. TASK-008 complete. 34 Python and 20 Node tests passed; Playwright confirmed 1280/390/320 px, home control, duration selection, direct routes, reload, all three offline readings and insecure HTTP (online reading available; offline saving unavailable). Full sources preserved byte-for-byte; shortened documents contain nested selections of complete original bullets. No new semantic audit was claimed. Next action: choose a reading budget in local use; deployment remains outside this task.
 
 - Layout follow-up (2026-10-21): reading-time selector now shares the topic-navigation row with Previous/Next and the counter. Playwright verified alignment within the viewport at 1280/390/320 px, duration changes, direct routes, reload, offline and HTTP; `make check` passed. Assets v30.
+
+## Study paths
+
+- Study paths are optional catalog entries with domains, modules, lessons and local completion state.
+- Story and Report lessons use the shared content contract and remain separate from certification attempts.
+- The public catalog remains empty; locally supplied study content is not included in the repository.
+- See the [content contract](../diataxis/reference/content-contract.md), [study path guide](../diataxis/how-to/add-study-path.md) and [Reports reference](../diataxis/reference/study-reports.md).

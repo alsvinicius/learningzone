@@ -109,7 +109,7 @@ def question_key(q):
 
 
 def validate_review(root, cert, *, allow_stale=False):
-    """Return the manifest; errors deliberately avoid exposing personal content."""
+    """Return the manifest; errors deliberately avoid exposing catalog content."""
     root = Path(root).resolve()
     check_ids(cert)
     descriptor = cert.get('preTestReview')
@@ -255,7 +255,7 @@ def main():
                   f'{sum(bool(q.get("pending")) for q in entries)} editorial pending item(s), '
                   f'{sum(r is not None and r.get("editorialStatus") != "reviewed" for r in reviews)} draft(s)')
     except (ReviewError, OSError, ValueError, KeyError, TypeError):
-        print('Review check failed: missing, invalid, incomplete or stale review; inspect locally without logging personal content')
+        print('Review check failed: missing, invalid, incomplete or stale review; inspect locally without logging catalog content')
         return 1
     return 0
 

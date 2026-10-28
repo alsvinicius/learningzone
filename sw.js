@@ -6,7 +6,7 @@
 
 importScripts("cache-utils.js");
 
-const VERSION = "sb-v11";
+const VERSION = "sb-v23";
 const STATIC_CACHE = `${VERSION}-static`;
 const CONTENT_CACHE = `${VERSION}-content`;
 const FONT_CACHE = `${VERSION}-fonts`;
@@ -14,10 +14,11 @@ const FONT_CACHE = `${VERSION}-fonts`;
 const CORE = [
   "./",
   "index.html",
-  "app.css?v=33",
-  "app.js?v=33",
-  "pretest.js?v=33",
-  "certification-status.js?v=33",
+  "app.css?v=40",
+  "app.js?v=39",
+  "pretest.js?v=35",
+  "certification-status.js?v=35",
+  "study-progress.js",
   "progress.js",
   "cache-utils.js",
   "manifest.webmanifest",
@@ -42,6 +43,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
       const keys = await caches.keys();
+      const oldShellVersion = keys.some((k) => /^sb-v\d+-static$/.test(k) && k !== STATIC_CACHE);
       await Promise.all(
         keys
           .filter((k) => k.startsWith("sb-") && ![STATIC_CACHE, CONTENT_CACHE, FONT_CACHE, 'sb-pretest-bundles-v1'].includes(k))
@@ -55,6 +57,19 @@ self.addEventListener("activate", (event) => {
         }
       }
       await self.clients.claim();
+      // Study/library pages show a manifest-driven catalogue. Refresh only
+      // those routes after a shell update so open tabs cannot keep an older
+      // catalogue; preserve the hash route. Other workspaces stay undisturbed.
+      if (oldShellVersion) {
+        const pages = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+        pages.forEach((page) => {
+          const url = new URL(page.url);
+          const needsFreshCatalog = url.hash === "#/certifications/gallery" || url.hash.startsWith("#/studies/");
+          // Do not await navigation from activate: its fetch may wait for this
+          // activation event to finish, which would deadlock the handoff.
+          if (needsFreshCatalog) page.navigate(page.url).catch(() => {});
+        });
+      }
     })()
   );
 });
@@ -149,7 +164,7 @@ self.addEventListener("fetch", (event) => {
   const rel = url.pathname.replace(/^\//, "");
   const base = rel.split("/").pop();
   const isShell =
-    ["", "index.html", "app.css", "app.js", "pretest.js", "certification-status.js", "progress.js", "cache-utils.js", "manifest.webmanifest", "sw.js"].includes(rel) ||
+    ["", "index.html", "app.css", "app.js", "pretest.js", "certification-status.js", "study-progress.js", "progress.js", "cache-utils.js", "manifest.webmanifest", "sw.js"].includes(rel) ||
     base === "index.html" ||
     rel.startsWith("icons/");
 

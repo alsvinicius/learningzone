@@ -13,18 +13,18 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
-<link rel="stylesheet" href="app.css?v=33">
+<link rel="stylesheet" href="app.css?v=40">
 </head>
 <body>
 
 <header class="appbar">
-  <div class="appbar__mark">Skill Builder <span>review</span></div>
+  <div class="appbar__mark">Skill Builder <span>study</span></div>
   <div class="appbar__spacer"></div>
   <button class="appbar__link appbar__link--icon" id="openStories" title="Story cards (s)">
     <span aria-hidden="true">▶</span><span class="appbar__label">Stories</span>
   </button>
-  <button class="appbar__link appbar__link--icon" id="openGallery" title="Certification gallery" aria-label="Certification Gallery">
-    <span aria-hidden="true">▦</span><span class="appbar__label">Gallery</span>
+    <button class="appbar__link appbar__link--icon" id="openGallery" title="Study library" aria-label="Study Library">
+    <span aria-hidden="true">▦</span><span class="appbar__label">Library</span>
   </button>
   <button class="appbar__link" id="openIndex">Reports <span class="appbar__n" id="indexCount">0</span></button>
   <button class="appbar__link appbar__link--icon" id="offlineBtn" title="Save this attempt for offline stories">
@@ -71,6 +71,7 @@
   <main class="main">
     <section class="study-scope" aria-label="Study content selection">
       <label>Certification<select id="certSelector" class="select"></select></label>
+      <label id="certDomainLabel" hidden>Domain<select id="certDomainSelector" class="select"></select><span class="domain-help" id="certDomainHelp"></span></label>
       <div class="cert-archive-state" id="certArchiveState" hidden></div>
       <label>Mock exam<select id="examSelector" class="select"></select></label>
       <label>Attempt<select id="attemptSelector" class="select"></select></label>
@@ -103,10 +104,10 @@
     <header class="cert-gallery__hero">
       <div>
         <div class="cert-gallery__eyebrow">Study portfolio</div>
-        <h1 id="galleryTitle" tabindex="-1">Certification Gallery</h1>
-        <p>See the certifications you are studying and the work you have completed.</p>
+        <h1 id="galleryTitle" tabindex="-1">Study Library</h1>
+        <p>Choose a study path or certification, then select a domain to focus your work.</p>
       </div>
-      <button class="btn" id="galleryBack">← Back to study</button>
+      <button class="btn" id="galleryBack">← Back to library</button>
     </header>
     <div id="galleryContent" aria-live="polite"></div>
   </div>
@@ -170,7 +171,7 @@
     <button class="reader__icon" id="indexClose" aria-label="Close">✕</button>
   </header>
   <div class="index__search">
-    <input class="input" id="indexSearch" type="search" placeholder="Filter reports" autocomplete="off">
+    <input class="input" id="indexSearch" aria-label="Buscar nos Reports" type="search" placeholder="Filter reports" autocomplete="off">
     <div class="index__tools">
       <div class="chips" id="readChips"></div>
       <span class="index__progress" id="readProgress"></span>
@@ -263,9 +264,10 @@
 <div class="toast" id="toast" role="status"></div>
 
 <script src="progress.js"></script>
-<script src="pretest.js?v=33"></script>
-<script src="certification-status.js?v=33"></script>
-<script src="app.js?v=33"></script>
+<script src="study-progress.js"></script>
+<script src="pretest.js?v=35"></script>
+<script src="certification-status.js?v=35"></script>
+<script src="app.js?v=39"></script>
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

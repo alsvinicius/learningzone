@@ -37,7 +37,7 @@ Para iniciar ou parar a interface por meio da Project Gallery, use `make start` 
 6. Revise `git status --short` e `git diff --check`. Confirme que nenhum dado pessoal ou exportação bruta aparece no diff.
 7. Abra um pull request descrevendo problema, comportamento anterior/novo, decisão de compatibilidade e evidências de validação.
 
-Não inclua screenshots com dados pessoais, dumps, cookies, tokens, exportações de cursos, questões protegidas, chaves ou dados do navegador. Se uma fixture for necessária, crie dados sintéticos originais em `tests/fixtures/`, identifique-os como sintéticos e mantenha-os pequenos.
+Não inclua screenshots com conteúdo local, dumps, cookies, tokens, exportações de cursos, questões protegidas, chaves ou dados do navegador. Se uma fixture for necessária, crie dados sintéticos originais em `tests/fixtures/`, identifique-os como sintéticos e mantenha-os pequenos.
 
 ## Testes e critérios de pronto
 
@@ -59,8 +59,14 @@ O contrato está em `docs/diataxis/reference/content-contract.md`. Mudanças inc
 
 Reporte vulnerabilidades em privado ao mantenedor do projeto, usando o canal de segurança configurado no repositório quando existir. Não publique detalhes exploráveis antes de uma correção coordenada. Não envie dados de usuários nos relatos. A aplicação não deve carregar Markdown remoto nem interpretar HTML arbitrário dos materiais.
 
+## Itens pessoais e arquivos versionados
+
+Não inclua em documentação, skills, exemplos, fixtures, screenshots, logs ou outros arquivos versionados dados de estudo, tentativas, respostas, notas, progresso, metas, planos individuais ou identificadores que revelem o contexto de uma pessoa. Documente a funcionalidade em termos genéricos e use somente exemplos sintéticos originais.
+
+Mantenha catálogos e registros locais em caminhos ignorados, como `data/` e `.local/`. Antes de concluir, revise `git status --short`, `git diff --cached`, `git diff` e os arquivos não rastreados; use `git check-ignore` para confirmar que cada arquivo local está excluído. `.gitignore` não remove conteúdo que já está rastreado.
+
 ## Escopo de revisão
 
 Uma contribuição não deve ampliar silenciosamente o produto para um serviço multiusuário ou de hospedagem de conteúdo. Discuta primeiro mudanças que adicionem sincronização, analytics, backend, dependências de terceiros, suporte específico de fornecedor ou distribuição de bancos de questões.
 
-Ao alterar o fluxo de autoria ou os sinais de revisão, preserve a [cobertura do Pre-Test Review](docs/diataxis/reference/pre-test-review.md). Atualizações de conteúdo devem seguir o [procedimento de consolidação](docs/diataxis/how-to/update-pre-test-review.md) e validar o índice privado explicitamente, sem copiar conteúdo pessoal para testes ou logs.
+Ao alterar o fluxo de autoria ou os sinais de revisão, preserve a [cobertura do Pre-Test Review](docs/diataxis/reference/pre-test-review.md). Atualizações de conteúdo devem seguir o [procedimento de consolidação](docs/diataxis/how-to/update-pre-test-review.md) e validar o índice local explicitamente, sem copiar conteúdo do catálogo para testes ou logs.

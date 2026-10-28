@@ -8,6 +8,12 @@ O repositório distribui software e documentação de uso, não um banco de prov
 
 Esse limite reduz a chance de exportações brutas, segredos ou materiais de terceiros entrarem em pull requests. Não copie conteúdo de usuário para documentação, logs, testes ou screenshots.
 
+## Itens pessoais e documentação pública
+
+Documentação, skills, exemplos, fixtures e demais arquivos versionados descrevem capacidades genéricas do produto. Não devem revelar o que uma pessoa está estudando, suas metas, certificações, tentativas, respostas, notas, progresso, planos individuais, nomes, identificadores, URLs privadas ou caminhos da máquina. Esses dados permanecem em arquivos locais ignorados; a regra vale também para nomes de arquivos, metadados, títulos de screenshots e mensagens de diagnóstico.
+
+Quando um exemplo ajudar a explicar um contrato, crie dados sintéticos originais e identifique-os como sintéticos. Um arquivo local não se torna apropriado para distribuição só por estar em `docs/`, por ter sido redigido ou por estar excluído pelo `.gitignore`; confirme o estado do Git antes de concluir.
+
 ## Licença de software não licencia materiais
 
 O código usa MIT. Essa licença cobre software e documentação distribuídos com o arquivo LICENSE; ela não concede direitos sobre conteúdo adicionado por usuários, marcas, questões de exame, cursos, imagens ou documentos externos. Quem cria, copia ou distribui conteúdo deve ter autorização e respeitar termos aplicáveis.

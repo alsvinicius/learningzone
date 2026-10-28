@@ -68,3 +68,7 @@ O link junto aos seletores abre a revisão de toda a certificação em `#/certif
 Na revisão, o índice de tópicos permanece na sidebar em desktop e no header recolhível em telas de até 900 px. **Search topics** filtra títulos. A seleção move o foco para a seção e fecha o menu móvel; `Esc` fecha primeiro esse menu, depois a revisão. Veja os [detalhes da navegação](pre-test-review.md#navegação-por-tópicos).
 
 O header do Pre-Test Review exibe `atual/total`, **Previous** e **Next**. O contador acompanha a seção atual; os botões percorrem todos os tópicos e ficam desabilitados nas extremidades.
+
+## Reports em estudos
+
+Em uma trilha, Reports e `r` abrem apenas os documentos `report` do estudo e domínio atuais, com busca no texto e filtros de conclusão explícita. A leitura usa a rota de lição e inclui navegação pelas seções. Na galeria, o controle fica indisponível. Consulte a [referência de Reports](study-reports.md).

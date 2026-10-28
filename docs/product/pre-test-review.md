@@ -38,7 +38,7 @@ Histórico: [revisão 1](../revision-history.md#pre-test-review). Execução: [p
 
 - DEC-007: um único índice é movido entre sidebar (>900 px) e header (até 900 px), evitando duplicação de controles; menu com busca, rolagem própria e foco no destino. A sidebar fica aberta; o menu móvel começa recolhido.
 
-Não há decisões de produto em aberto. O usuário autorizou leitura e preparação do conteúdo pessoal; o limite confirmado é não versioná-lo. Regras normativas: [referência](../diataxis/reference/pre-test-review.md).
+Não há decisões de produto em aberto. O conteúdo de cada instalação permanece local e fora do catálogo público. Regras normativas: [referência](../diataxis/reference/pre-test-review.md).
 
 ## Reading budgets (2026-10-21)
 

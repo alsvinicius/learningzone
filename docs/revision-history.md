@@ -20,3 +20,7 @@
 
 - 2026-10-23 — revisão 1 dos requisitos, plano e estado: requisitos/jornadas/decisões e TASK-001 registrados a partir do pedido para arquivar certificações e consultar uma galeria local.
 - 2026-10-23 — revisão 2 do estado: TASK-001 implementada; arquivamento/restauração em localStorage, galeria, documentação Diátaxis, 34 testes Python, 24 Node, verificação do catálogo público e revisão visual sintética em desktop/celular concluídas.
+
+## Study paths and domains
+
+- 2026-10-23 — documented optional study catalogs, domain navigation, separate local completion state, contextual Story and Report lessons, and offline support. The content contract remains additive and the public catalog stays empty.

@@ -57,19 +57,19 @@ def check_pwa():
     else:
         with open(sw_path, encoding="utf-8") as fh:
             sw = fh.read()
-    for needle in ("index.html", "app.js", "progress.js", "cache-utils.js", "app.css", "navigationPreload", "CACHE_URLS", "SKIP_WAITING"):
+    for needle in ("index.html", "app.js", "study-progress.js", "progress.js", "cache-utils.js", "app.css", "navigationPreload", "CACHE_URLS", "SKIP_WAITING", "oldShellVersion", "page.navigate"):
             if needle not in sw:
                 fail(f"sw.js does not mention {needle}")
 
     with open(os.path.join(ROOT, "index.html"), encoding="utf-8") as fh:
         html = fh.read()
-    for needle in ("manifest.webmanifest", "progress.js", "sw.js", "installBtn", "offlineBtn", "apple-touch-icon", 'name="theme-color"'):
+    for needle in ("manifest.webmanifest", "progress.js", "study-progress.js", "sw.js", "installBtn", "offlineBtn", "apple-touch-icon", 'name="theme-color"'):
         if needle not in html:
             fail(f"index.html does not mention {needle}")
 
     with open(os.path.join(ROOT, "app.js"), encoding="utf-8") as fh:
         js = fh.read()
-    for needle in ("wirePwa", "storyUrls", "saveOffline", "beforeinstallprompt", "refreshOfflineUi"):
+    for needle in ("wirePwa", "storyUrls", "saveOffline", "beforeinstallprompt", "refreshOfflineUi", "controllerchange", "location.reload()"):
         if needle not in js:
             fail(f"app.js does not mention {needle}")
 

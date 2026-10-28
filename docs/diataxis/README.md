@@ -10,6 +10,7 @@ Escolha pela necessidade. Tutoriais ensinam um caminho completo com exemplo sint
 ## Guias práticos — realizar uma tarefa
 
 - [Adicionar conteúdo de estudo](how-to/add-study-content.md): organizar diretórios e registrar conteúdo próprio.
+- [Criar uma trilha de estudo](how-to/add-study-path.md): definir domínios, módulos, lições e validar o catálogo local.
 - [Adicionar uma tentativa](how-to/add-attempt.md): normalizar resultados de uma fonte para o formato comum.
 - [Escrever cartões Stories](how-to/write-story-card.md): seguir o formato e relacionar cartões às questões.
 - [Usar a aplicação offline](how-to/install-and-use-offline.md): servir localmente, instalar e salvar materiais.
@@ -20,9 +21,11 @@ Escolha pela necessidade. Tutoriais ensinam um caminho completo com exemplo sint
 
 ## Referência — consultar fatos e contratos
 
-- [Contrato de conteúdo v1](reference/content-contract.md): JSON, campos, IDs, escopos, caminhos e validação.
+- [Contrato de conteúdo v1](reference/content-contract.md): JSON, campos, IDs, escopos, caminhos e validação, incluindo estudos e domínios.
 - [Modelo normalizado de tentativa](reference/attempt-data.md): estrutura de resultados e questões.
+- [Estudos e navegação por domínios](explanation/study-paths-and-domains.md): seleção, progresso e associação de conteúdo.
 - [Formato Stories](reference/story-card-format.md): quatro ecrãs, conteúdo de cada um e metadados obrigatórios.
+- [Reports de estudo](reference/study-reports.md): índice contextual, busca, leitura por seções e autoria de aprofundamento.
 - [Interface e atalhos](reference/interface-and-shortcuts.md): filtros, comandos e navegação.
 - [Cache PWA](reference/pwa-cache.md): arquivos armazenados e atualização.
 - [Comandos e requisitos](reference/development-commands.md): Makefile, ferramentas e versões mínimas.

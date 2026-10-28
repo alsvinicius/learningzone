@@ -28,6 +28,14 @@ const state = {
   galleryOpen: false,
   certificationMaterialCounts: new Map(),
   galleryRenderToken: 0,
+  studyOpen: false,
+  selectedDomainId: null,
+  activeStudy: null,
+  activeStudyManifest: null,
+  activeStudyModule: null,
+  activeStudyLesson: null,
+  studyViewToken: 0,
+  studyReportIndex: null,
 };
 
 /* Read state lives in localStorage: the app has no backend, and "which reports
@@ -191,8 +199,12 @@ function renderInline(text, base = "") {
   out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (all, label, href) => {
     // Cross-note links are relative to the attempt folder. The page sits at the
     // root, so without the prefix the click 404s.
-    const target = /^[a-z]+:\/\//.test(href) || href.startsWith("#") ? href : base + href;
-    return `<a href="${target}" target="_blank" rel="noopener">${label}</a>`;
+    let decoded;
+    try { decoded = decodeURIComponent(href); } catch { return label; }
+    if (/^https?:\/\//i.test(href)) return `<a href="${esc(href)}" target="_blank" rel="noopener">${label}</a>`;
+    if (href.startsWith("#")) return `<a href="${esc(href)}">${label}</a>`;
+    if (/^(\/|\\|[a-z]+:)/i.test(decoded) || decoded.split(/[\\/]/).includes("..")) return label;
+    return `<a href="${esc(base + href)}" target="_blank" rel="noopener">${label}</a>`;
   });
   return out;
 }
@@ -334,6 +346,7 @@ function visibleQuestions() {
   const f = state.filters;
   const needle = f.q.trim().toLowerCase();
   return state.attempt.questions.filter((q) => {
+    if (state.selectedDomainId && q.domainId && String(q.domainId) !== state.selectedDomainId) return false;
     if (f.status !== "all" && q.status !== f.status) return false;
     if (f.type !== "all" && q.type !== f.type) return false;
     if (f.confidence !== "all" && (q.confidence || "UNSURE") !== f.confidence) return false;
@@ -362,6 +375,12 @@ function visibleQuestions() {
 
 function currentCertification() {
   return state.manifest?.certifications.find((x) => x.id === state.selectedCertificationId);
+}
+
+function certificationDomains() {
+  const declared = currentCertification()?.domains;
+  if (declared?.length) return declared.map((domain) => ({ id: domain.id, name: domain.name, description: domain.description || "", aggregateOnly: false }));
+  return (state.attempt?.domains || []).map((domain) => ({ id: String(domain.code), name: domain.name, description: "Score aggregate from this attempt.", aggregateOnly: !state.attempt.questions?.some((q) => q.domainId != null) }));
 }
 
 function certificationArchive(certId) {
@@ -460,42 +479,183 @@ function renderCertificationCard(cert, counts) {
   </article>`;
 }
 
+function safeStudyUrl(base, path) {
+  if (typeof path !== "string" || !path || path.startsWith("/") || path.includes("\\") || path.split("/").some((part) => part === ".." || part === "")) return null;
+  return `${DATA}${base}${path}`;
+}
+
+function studyProgressCounts(study) {
+  const stateData = StudyPathProgress.read(localStorage).studies[study.id] || { completed: [] };
+  const done = new Set(stateData.completed || []);
+  return { done: done.size, total: study.modules.reduce((n, m) => n + m.lessons.length, 0) };
+}
+
+function studyCard(study) {
+  const counts = studyProgressCounts(study);
+  return `<article class="cert-card study-card">
+    <div class="cert-card__top"><span class="cert-card__status">Trilha de estudo</span><span class="cert-card__date">${study.domains.length} domains</span></div>
+    <h3>${esc(study.title)}</h3>
+    <div class="cert-card__metrics"><span><b>${counts.done}/${counts.total}</b> lessons marcadas como concluídas</span><span>${esc(study.description || "")}</span></div>
+    <div class="cert-card__actions"><button class="btn btn--primary" data-open-study="${esc(study.id)}">Explore domains</button></div>
+  </article>`;
+}
+
+async function loadStudy(studyId) {
+  const entry = (state.manifest?.studies || []).find((item) => item.id === studyId);
+  if (!entry) return null;
+  const path = safeStudyUrl("", entry.path);
+  if (!path) return null;
+  const response = await fetch(path);
+  if (!response.ok) throw new Error("Study path is unavailable.");
+  const study = await response.json();
+  return { entry, study, base: entry.path.replace(/study\.json$/, "") };
+}
+
+function studyRoute(studyId, domainId = null, moduleId = null, lessonId = null) {
+  return `#/studies/${studyId}${domainId ? `/${domainId}` : ""}${moduleId ? `/${moduleId}` : ""}${lessonId ? `/${lessonId}` : ""}`;
+}
+
+function studyLessonDomains(module, lesson) {
+  return [...new Set([module.domainId, ...(lesson.domainIds || [])])];
+}
+
+async function openStudyPath(studyId, { push = true } = {}) {
+  if (!el("index").hidden) closeIndex();
+  if (state.deck.open) { state.deck.progressChanged = false; closeDeck(); }
+  const token = ++state.studyViewToken;
+  if (state.report.open) closeReportPage();
+  state.galleryOpen = false;
+  state.studyOpen = true;
+  el("openStories").disabled = false;
+  el("openStories").setAttribute("aria-label", "Stories da trilha");
+  el("openIndex").disabled = true;
+  el("openIndex").setAttribute("aria-label", "Reports da trilha");
+  el("shell").hidden = true;
+  el("certGallery").hidden = false;
+  el("galleryTitle").textContent = "Trilhas de estudo";
+  el("galleryBack").textContent = "← Back to library";
+  el("galleryBack").hidden = false;
+  document.title = "Trilha de estudo — Skill Builder";
+  const parts = location.hash.slice(2).split("/");
+  const domainId = parts[2] || null, moduleId = parts[3] || null, lessonId = parts[4] || null;
+  if (push && location.hash !== studyRoute(studyId, domainId, moduleId, lessonId)) {
+    location.hash = studyRoute(studyId, domainId, moduleId, lessonId);
+    return;
+  }
+  const host = el("galleryContent");
+  host.innerHTML = `<div class="empty">Loading study path…</div>`;
+  try {
+    const loaded = await loadStudy(studyId);
+    if (token !== state.studyViewToken || !loaded) return;
+    const { study, base } = loaded;
+    state.activeStudy = study;
+    state.activeStudyManifest = loaded;
+    const domain = study.domains.find((item) => item.id === domainId) || null;
+    el("openIndex").disabled = false;
+    el("indexCount").textContent = studyReportItems(study, domainId).length;
+    const modules = study.modules.filter((module) => !domain || module.domainId === domain.id || module.lessons.some((lesson) => studyLessonDomains(module, lesson).includes(domain.id)));
+    const completed = new Set((StudyPathProgress.read(localStorage).studies[study.id]?.completed) || []);
+    const title = domain ? `${esc(study.title)} · ${esc(domain.name)}` : esc(study.title);
+    const domainNav = `<nav class="domain-nav" aria-label="Domínios do estudo"><a class="domain-pill${domain ? "" : " is-current"}" href="${studyRoute(study.id)}" aria-current="${domain ? "false" : "page"}">Todos os domínios</a>${study.domains.map((item) => `<a class="domain-pill${domain?.id === item.id ? " is-current" : ""}" href="${studyRoute(study.id, item.id)}" aria-current="${domain?.id === item.id ? "page" : "false"}">${esc(item.name)}</a>`).join("")}</nav>`;
+    let body;
+    if (lessonId) {
+      const module = study.modules.find((item) => item.id === moduleId);
+      const lesson = module?.lessons.find((item) => item.id === lessonId);
+      if (!module || !lesson || (domainId && !studyLessonDomains(module, lesson).includes(domainId))) {
+        body = `<div class="empty">Esta lição não está disponível no domínio selecionado.</div>`;
+      } else {
+        const currentDomain = domainId || module.domainId;
+        const ordered = study.modules.flatMap((item) => item.lessons.filter((unit) => studyLessonDomains(item, unit).includes(currentDomain)).map((unit) => ({ module: item, lesson: unit })));
+        const index = ordered.findIndex((item) => item.lesson.id === lessonId && item.module.id === moduleId);
+        const previous = ordered[index - 1], next = ordered[index + 1];
+        const done = completed.has(StudyPathProgress.lessonKey(module.id, lesson.id));
+        const review = StudyPathProgress.isReview(localStorage, study.id, module.id, lesson.id);
+        const url = safeStudyUrl(base, lesson.path);
+        if (!url) throw new Error("Study lesson path is invalid.");
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Study lesson could not be loaded.");
+        const markdown = await response.text();
+        if (token !== state.studyViewToken) return;
+        body = `<article class="study-lesson"><div class="study-crumb"><a href="${studyRoute(study.id, currentDomain)}">${esc(domain?.name || study.domains.find((d) => d.id === module.domainId)?.name || "Domínio")}</a> / ${esc(module.title)}</div><div class="study-lesson__actions"><button class="btn" data-toggle-study-complete="${esc(module.id)}|${esc(lesson.id)}" aria-pressed="${done}">${done ? "✓ Concluída · desfazer" : "Marcar como concluída"}</button><button class="btn" data-toggle-study-review="${esc(module.id)}|${esc(lesson.id)}" aria-pressed="${review}">${review ? "★ Revisar depois" : "☆ Marcar para revisar"}</button></div>${lesson.type === "report" ? `<details class="study-report-outline"><summary>Conteúdo deste Report</summary><nav aria-label="Seções do Report"></nav></details>` : ""}<article class="md md--reader study-markdown" lang="pt-BR">${renderMarkdown(markdown, DATA + base)}</article><nav class="study-next" aria-label="Navegação das lições"><a class="btn" href="${previous ? studyRoute(study.id, currentDomain, previous.module.id, previous.lesson.id) : studyRoute(study.id, currentDomain)}">← ${previous ? esc(previous.lesson.title) : "Visão do domínio"}</a><span>${index + 1} / ${ordered.length}</span><a class="btn btn--primary" href="${next ? studyRoute(study.id, currentDomain, next.module.id, next.lesson.id) : studyRoute(study.id)}">${next ? esc(next.lesson.title) : "Todos os domínios"} →</a></nav></article>`;
+      }
+    } else {
+      body = domain
+        ? `<div class="domain-heading"><p>${esc(domain.description || "")} </p><p>${modules.reduce((sum, m) => sum + m.lessons.filter((l) => studyLessonDomains(m, l).includes(domain.id)).length, 0)} lições · ${modules.reduce((sum, m) => sum + m.lessons.filter((l) => studyLessonDomains(m, l).includes(domain.id) && completed.has(StudyPathProgress.lessonKey(m.id, l.id))).length, 0)} marcadas como concluídas</p></div><div class="study-modules">${modules.map((module) => `<section class="study-module"><div class="study-module__head"><span>${esc(domain.name)}</span><h2>${esc(module.title)}</h2></div><ol>${module.lessons.filter((lesson) => studyLessonDomains(module, lesson).includes(domain.id)).map((lesson) => `<li><a href="${studyRoute(study.id, domain.id, module.id, lesson.id)}">${esc(lesson.title)}</a><span>${completed.has(StudyPathProgress.lessonKey(module.id, lesson.id)) ? "✓ Concluída" : esc(lesson.type.replaceAll("-", " "))}</span></li>`).join("")}</ol></section>`).join("")}</div>`
+        : `<p class="study-intro">Escolha um domínio para estudar em profundidade ou abra a formação completa.</p><div class="domain-grid">${study.domains.map((item) => { const scoped = study.modules.filter((m) => m.domainId === item.id || m.lessons.some((l) => studyLessonDomains(m, l).includes(item.id))); const total = scoped.reduce((n, m) => n + m.lessons.filter((l) => studyLessonDomains(m, l).includes(item.id)).length, 0); const done = scoped.reduce((n, m) => n + m.lessons.filter((l) => studyLessonDomains(m, l).includes(item.id) && completed.has(StudyPathProgress.lessonKey(m.id, l.id))).length, 0); return `<a class="domain-card" href="${studyRoute(study.id, item.id)}"><span class="domain-card__count">${scoped.length} módulos</span><h2>${esc(item.name)}</h2><p>${esc(item.description)}</p><span class="domain-card__progress">${done} de ${total} lições concluídas</span></a>`; }).join("")}<a class="domain-card domain-card--all" href="${studyRoute(study.id)}"><span class="domain-card__count">Trilha completa</span><h2>Todos os domínios</h2><p>Consulte a sequência completa de backend, arquitetura, plataforma e infraestrutura.</p></a></div>`;
+    }
+    host.innerHTML = `<div class="study-path"><div class="study-path__top"><span>Trilha de estudo</span><a href="#/certifications/gallery">Todas as trilhas</a></div><h2 class="study-path__title" tabindex="-1">${title}</h2>${domainNav}${body}</div>`;
+    buildStudyReportOutline(host);
+    wrapTables(host);
+    el("galleryTitle").textContent = domain ? domain.name : (lessonId ? "Lição" : study.title);
+    host.querySelector(".study-path__title")?.focus?.({ preventScroll: true });
+    refreshOfflineUi();
+  } catch {
+    if (token === state.studyViewToken) host.innerHTML = `<div class="empty">Study content is unavailable. Check the local catalog and try again.</div>`;
+  }
+}
+
 async function renderCertificationGallery() {
   const host = el("galleryContent");
   if (!host || !state.manifest) return;
   const token = ++state.galleryRenderToken;
   const certs = state.manifest.certifications || [];
-  if (!certs.length) {
-    host.innerHTML = `<div class="empty">No certifications in <code>data/index.json</code> yet.</div>`;
+  const studies = state.manifest.studies || [];
+  if (!certs.length && !studies.length) {
+    host.innerHTML = `<div class="empty">No study paths or certifications in <code>data/index.json</code> yet.</div>`;
     return;
   }
-  host.innerHTML = `<div class="empty">Loading certification summaries…</div>`;
-  const counts = await Promise.all(certs.map(certificationMaterialCounts));
+  host.innerHTML = `<div class="empty">Loading your study library…</div>`;
+  const [counts, loadedStudies] = await Promise.all([
+    Promise.all(certs.map(certificationMaterialCounts)),
+    Promise.all(studies.map((entry) => loadStudy(entry.id).catch(() => null))),
+  ]);
   if (token !== state.galleryRenderToken || !state.galleryOpen) return;
   const active = certs.filter((cert) => !certificationArchive(cert.id));
   const archived = certs.filter((cert) => certificationArchive(cert.id));
   const section = (title, items) => items.length
     ? `<section class="cert-gallery__section"><h2>${title}<span>${items.length}</span></h2><div class="cert-gallery__grid">${items.map((cert) => renderCertificationCard(cert, counts[certs.indexOf(cert)])).join("")}</div></section>`
     : "";
-  host.innerHTML = `${section("Currently studying", active)}${section("Archived", archived)}` || `<div class="empty">No certifications to show.</div>`;
+  const studyItems = loadedStudies.filter(Boolean).map((item) => item.study);
+  host.innerHTML = `${studies.length ? `<section class="cert-gallery__section"><h2>Study paths<span>${studies.length}</span></h2><div class="cert-gallery__grid">${studyItems.map(studyCard).join("")}</div>${studyItems.length < studies.length ? `<p class="panel__hint">Some study manifests are unavailable.</p>` : ""}</section>` : ""}${section("Currently studying", active)}${section("Archived", archived)}` || `<div class="empty">No study paths to show.</div>`;
 }
 
 function openCertificationGallery({ push = true } = {}) {
+  if (!el("index").hidden) closeIndex();
+  if (state.deck.open) { state.deck.progressChanged = false; closeDeck(); }
   if (state.report.open) closeReportPage();
   state.galleryOpen = true;
+  state.studyOpen = false;
+  el("openStories").disabled = true;
+  el("openIndex").disabled = true;
+  el("indexCount").textContent = "0";
+  el("openStories").setAttribute("aria-label", "Escolha uma trilha ou certificação para abrir Stories");
   el("shell").hidden = true;
   el("certGallery").hidden = false;
-  document.title = "Certification Gallery — Skill Builder";
+  document.title = "Study Library — Skill Builder";
   if (push && location.hash !== "#/certifications/gallery") location.hash = "#/certifications/gallery";
+  el("galleryTitle").textContent = "Study Library";
   renderCertificationGallery();
   el("galleryTitle").focus({ preventScroll: true });
 }
 
 function closeCertificationGallery() {
   state.galleryOpen = false;
+  state.studyOpen = false;
+  el("openStories").disabled = !state.attempt;
+  el("openStories").setAttribute("aria-label", "Stories");
+  el("openIndex").disabled = !state.attempt;
+  el("openIndex").setAttribute("aria-label", "Reports");
   el("certGallery").hidden = true;
   el("shell").hidden = false;
   document.title = APP_TITLE;
+}
+
+function studyOfflineUrls() {
+  const loaded = state.activeStudyManifest;
+  if (!loaded) return [];
+  const urls = [`${DATA}index.json`, safeStudyUrl("", loaded.entry.path)];
+  for (const module of loaded.study.modules) for (const lesson of module.lessons) urls.push(safeStudyUrl(loaded.base, lesson.path));
+  return [...new Set(urls.filter(Boolean))];
 }
 
 function openCertificationStudy(certId) {
@@ -623,6 +783,16 @@ function renderCatalogControls() {
     ? attempts.map((x) => `<option value="${esc(x.id)}">${esc(attemptLabel(x))}</option>`).join("")
     : `<option value="">No attempts yet</option>`;
   el("attemptSelector").value = attempts.find((x) => x.id === state.attempt?.attemptId)?.id || attempts[0]?.id || "";
+  const domains = certificationDomains();
+  const domainLabel = el("certDomainLabel");
+  domainLabel.hidden = !domains.length;
+  if (domains.length) {
+    const stored = localStorage.getItem(`sb-cert-domain:${cert?.id}`) || "";
+    if (!state.selectedDomainId || !domains.some((d) => d.id === state.selectedDomainId)) state.selectedDomainId = domains.some((d) => d.id === stored) ? stored : "";
+    el("certDomainSelector").innerHTML = `<option value="">All domains</option>${domains.map((d) => `<option value="${esc(d.id)}">${esc(d.name)}${d.aggregateOnly ? " · aggregate only" : ""}</option>`).join("")}`;
+    el("certDomainSelector").value = state.selectedDomainId;
+    el("certDomainHelp").textContent = domains.some((d) => d.aggregateOnly) ? "Esta tentativa tem agregados por domínio; sem vínculos por questão, a lista continua sem filtro." : (state.attempt?.questions?.some((q) => q.domainId == null) ? "Questões sem associação explícita permanecem visíveis." : "Questões e materiais usam associações explícitas.");
+  } else state.selectedDomainId = "";
   el("examSelector").disabled = !(cert?.exams.length);
   el("attemptSelector").disabled = !attempts.length;
   renderMaterialShelf();
@@ -636,16 +806,17 @@ function renderMaterialShelf() {
     ...shared.map((m) => ({ ...m, scope: "exam" })),
     ...own.map((m) => ({ ...m, scope: "attempt" })),
   ];
+  const matching = state.selectedDomainId ? items.filter((m) => (m.domainIds || []).includes(state.selectedDomainId)) : items;
   if (!items.length) {
     host.innerHTML = `<span class="panel__hint">No study materials in this exam yet.</span>`;
     return;
   }
-  host.innerHTML = items.map((m) =>
+  host.innerHTML = `${state.selectedDomainId && !matching.length ? `<span class="panel__hint">No materials are explicitly associated with this domain. ${items.length} materials remain available in All domains.</span>` : ""}${matching.map((m) =>
     `<button class="material-chip" data-material="${esc(m.id)}" data-scope="${m.scope}">
       ${m.type === "story" ? "▶ Story" : "▤ Report"} · ${esc(m.title)}
       <small>${m.scope === "exam" ? "shared" : "this attempt"}</small>
     </button>`
-  ).join("");
+  ).join("")}`;
 }
 
 function renderRail() {
@@ -928,6 +1099,10 @@ function renderChips() {
 }
 
 function renderAll() {
+  if (!state.galleryOpen && !state.studyOpen) {
+    el("openStories").disabled = !state.attempt;
+    el("openStories").setAttribute("aria-label", "Stories");
+  }
   renderCatalogControls();
   renderRail();
   if (!state.attempt) {
@@ -1025,6 +1200,12 @@ const CARD_SECTIONS = [
   "Why the right answer was different",
   "Concepts to nail it next time",
 ];
+const LEARNING_CARD_SECTIONS = [
+  "Topic",
+  "Where the initial model breaks",
+  "A more complete model",
+  "Concepts to nail it next time",
+];
 
 const cardPath = (q) => q.card;
 
@@ -1037,7 +1218,8 @@ function cardFor(n) {
 function parseCard(text) {
   const lines = text.replace(/\r\n?/g, "\n").split("\n");
   const head = { title: "", meta: {} };
-  const screens = CARD_SECTIONS.map((name) => ({ name, body: [] }));
+  const names = /^\s*[-*]\s+\*\*Story mode\*\*\s*:\s*learning\s*$/im.test(text) ? LEARNING_CARD_SECTIONS : CARD_SECTIONS;
+  const screens = names.map((name) => ({ name, body: [] }));
   let cur = null;
 
   for (const line of lines) {
@@ -1050,7 +1232,7 @@ function parseCard(text) {
     // swallowed as front matter and every screen would read as empty.
     const h2 = /^##\s+(.*)$/.exec(line);
     if (h2) {
-      const i = CARD_SECTIONS.indexOf(h2[1].trim());
+      const i = names.indexOf(h2[1].trim());
       if (i >= 0) cur = screens[i];
       continue;
     }
@@ -1266,6 +1448,12 @@ function onReaderScroll() {
 const reportList = () => state.attempt.questions.filter((q) => q.note);
 
 function openIndex() {
+  if (state.studyOpen) return openStudyReportIndex();
+  if (state.galleryOpen || !state.attempt) {
+    toast("Escolha uma trilha ou certificação para abrir seus Reports.");
+    return;
+  }
+  state.studyReportIndex = null;
   const all = reportList();
   const date = formatAttemptDate(state.attempt);
   el("indexSub").textContent = `${all.length} reports for this attempt${date ? ` · ${date}` : ""}`;
@@ -1273,16 +1461,94 @@ function openIndex() {
   document.body.style.overflow = "hidden";
   renderReadFilter();
   renderIndex("");
+  el("indexSearch").value = "";
+  el("indexSearch").focus();
 }
 
 function closeIndex() {
+  state.studyReportIndex = null;
   el("index").hidden = true;
   document.body.style.overflow = "";
+  el("openIndex").focus();
+}
+
+function buildStudyReportOutline(host) {
+  const nav = host.querySelector('.study-report-outline nav');
+  if (!nav) return;
+  host.querySelectorAll('.study-markdown h2').forEach((heading, index) => {
+    heading.id = `study-report-section-${index}`;
+    heading.tabIndex = -1;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'btn';
+    button.textContent = heading.textContent;
+    button.addEventListener('click', () => {
+      heading.scrollIntoView({ block: 'start' });
+      heading.focus({ preventScroll: true });
+    });
+    nav.append(button);
+  });
+}
+
+function studyReportItems(study, domainId = null) {
+  return study.modules.flatMap((module) => module.lessons
+    .filter((lesson) => lesson.type === "report" && (!domainId || studyLessonDomains(module, lesson).includes(domainId)))
+    .map((lesson) => ({ module, lesson, domainId: domainId || module.domainId })));
+}
+
+async function openStudyReportIndex() {
+  const route = /^#\/studies\/([a-z0-9-]+)(?:\/([a-z0-9-]+))?/.exec(location.hash);
+  if (!route) return;
+  const context = location.hash;
+  try {
+    const loaded = await loadStudy(route[1]);
+    if (!loaded || !state.studyOpen || location.hash !== context) return;
+    const items = studyReportItems(loaded.study, route[2] || null);
+    const index = { ...loaded, items, context };
+    state.studyReportIndex = index;
+    el("indexSearch").value = "";
+    el("indexSub").textContent = `${items.length} Reports · ${loaded.study.title}${route[2] ? ` · ${loaded.study.domains.find((d) => d.id === route[2])?.name || route[2]}` : " · Todos os domínios"}`;
+    el("index").hidden = false;
+    document.body.style.overflow = "hidden";
+    renderReadFilter();
+    renderIndex("");
+    el("indexSearch").focus();
+    await Promise.all(items.map(async (item) => {
+      try {
+        const url = safeStudyUrl(loaded.base, item.lesson.path);
+        if (!url) return;
+        const response = await fetch(url);
+        if (response.ok) item.searchText = await response.text();
+      } catch { /* The lesson reader reports unavailable files on open. */ }
+    }));
+    if (state.studyReportIndex === index && !el("index").hidden && location.hash === context) renderIndex(el("indexSearch").value);
+  } catch { toast("Não foi possível carregar os Reports da trilha."); }
+}
+
+function renderStudyReportIndex(needle) {
+  const index = state.studyReportIndex;
+  if (!index) return;
+  const term = needle.trim().toLocaleLowerCase();
+  const completed = (item) => StudyPathProgress.isComplete(localStorage, index.study.id, item.module.id, item.lesson.id);
+  const items = index.items.filter((item) =>
+    (state.readFilter !== "unread" || !completed(item)) &&
+    (state.readFilter !== "read" || completed(item)) &&
+    (!term || [item.lesson.title, item.module.title, item.searchText || ""].join(" ").toLocaleLowerCase().includes(term)));
+  el("indexBody").innerHTML = items.map((item) => `<div class="rpt${completed(item) ? " rpt--read" : ""}"><a class="rpt__main" data-study-report href="${esc(studyRoute(index.study.id, item.domainId, item.module.id, item.lesson.id))}"><span class="rpt__n">R</span><span><span class="rpt__topic">${esc(item.lesson.title)}</span><span class="rpt__meta">${esc(item.module.title)} · ${completed(item) ? "Concluído" : "Pendente"}</span></span></a></div>`).join("") || `<div class="empty">Nenhum Report neste filtro.</div>`;
 }
 
 /* Three views of the same list: what is left, everything, what is done. The
    counts sit in the chips so the choice is legible without opening anything. */
 function renderReadFilter() {
+  if (state.studyReportIndex) {
+    const { study, items } = state.studyReportIndex;
+    const done = items.filter((item) => StudyPathProgress.isComplete(localStorage, study.id, item.module.id, item.lesson.id)).length;
+    const counts = { unread: items.length - done, all: items.length, read: done };
+    const labels = { unread: "Pendentes", all: "Todos", read: "Concluídos" };
+    el("readChips").innerHTML = Object.keys(labels).map((key) => `<button class="chip" data-readfilter="${key}" aria-pressed="${state.readFilter === key}">${labels[key]}<span class="chip__n">${counts[key]}</span></button>`).join("");
+    el("readProgress").textContent = `${done} de ${items.length} concluídos · marcação explícita`;
+    return;
+  }
   const all = reportList();
   if (!all.length) return;
   const read = all.filter((q) => isRead(q.n)).length;
@@ -1297,6 +1563,8 @@ function renderReadFilter() {
 }
 
 function renderIndex(needle) {
+  if (el("index").hidden) return;
+  if (state.studyReportIndex) return renderStudyReportIndex(needle);
   const term = needle.trim().toLowerCase();
   const items = reportList()
     .map((x) => ({ q: x, mins: state.readMinutes.get(x.note) || 0 }))
@@ -1343,6 +1611,7 @@ function renderIndex(needle) {
    attempt and buys read times in the index, instant story screens, and search
    across both bodies. */
 async function prefetchNotes() {
+  const attempt = state.attempt;
   const notes = reportList();
   const cards = state.attempt.questions.filter((q) => q.card);
   await Promise.all([
@@ -1369,7 +1638,9 @@ async function prefetchNotes() {
       }
     }),
   ]);
-  el("indexCount").textContent = notes.length;
+  if (state.attempt === attempt && !state.studyOpen && !state.galleryOpen) {
+    el("indexCount").textContent = notes.length;
+  }
 }
 
 /* ---------- Full-page report ---------- */
@@ -1382,12 +1653,12 @@ const APP_TITLE = "Skill Builder — certification study library";
 
 function selectionHash() {
   const a = state.attempt;
-  if (!a) return `#${state.selectedCertificationId || ""}/${state.selectedExamId || ""}`;
-  return `#${a.certificationId}/${a.examId}/${a.attemptId}`;
+  const path = !a ? `#${state.selectedCertificationId || ""}/${state.selectedExamId || ""}` : `#${a.certificationId}/${a.examId}/${a.attemptId}`;
+  return state.selectedDomainId ? `${path}?domain=${encodeURIComponent(state.selectedDomainId)}` : path;
 }
 
 function reportHash(material) {
-  return `${selectionHash()}/${material.id}`;
+  return `${selectionHash().split("?")[0]}/${material.id}${state.selectedDomainId ? `?domain=${encodeURIComponent(state.selectedDomainId)}` : ""}`;
 }
 
 function materialForId(id) {
@@ -1747,6 +2018,10 @@ function closeReportPage() {
 }
 
 function handleReportRoute() {
+  const [routePath, routeQuery = ""] = location.hash.split("?");
+  const query = new URLSearchParams(routeQuery);
+  const routeDomain = query.get("domain");
+  if (routeDomain) state.selectedDomainId = routeDomain;
   const reviewRoute = /^#\/certifications\/([a-z0-9-]+)\/pre-test-review(?:\?reading=(10|30|60))?$/.exec(location.hash);
   if (reviewRoute) {
     if (state.report.open && state.report.material?.reviewCertId === reviewRoute[1] && state.report.material?.readingMinutes === Number(reviewRoute[2] || 60)) return;
@@ -1762,7 +2037,7 @@ function handleReportRoute() {
     }
     return;
   }
-  const parts = location.hash.slice(1).split("/");
+  const parts = routePath.slice(1).split("/");
   const id = parts[3] || null;
   if (!id) {
     if (state.report.open) closeReportPage();
@@ -1918,7 +2193,28 @@ function storyUrls() {
    on every render. */
 async function refreshOfflineUi() {
   const label = el("offlineLabel");
-  if (!label || !state.attempt) return;
+  if (!label) return;
+  const supported = window.isSecureContext && "serviceWorker" in navigator && "caches" in window;
+  if (!supported) {
+    el("offlineBtn").disabled = true;
+    el("offlineBtn").title = "Offline saving requires HTTPS or localhost and browser storage support. Online reading remains available.";
+    label.textContent = "Offline unavailable";
+    return;
+  }
+  el("offlineBtn").disabled = !state.studyOpen && !state.attempt;
+  if (state.studyOpen) {
+    if (!("caches" in window)) return;
+    try {
+      const urls = studyOfflineUrls();
+      let hit = 0;
+      for (const url of urls) if (await caches.match(url)) hit++;
+      const ready = urls.length > 0 && hit >= urls.length;
+      label.textContent = ready ? "✓ Offline" : "Offline";
+      el("offlineBtn").title = ready ? "This study path is saved for offline reading" : "Save this study path for offline reading";
+    } catch { /* Cache API can be unavailable in private browsing. */ }
+    return;
+  }
+  if (!state.attempt) return;
   if (!("caches" in window)) return;
   try {
     const urls = storyUrls();
@@ -1938,9 +2234,14 @@ async function refreshOfflineUi() {
 }
 
 async function saveOffline() {
+  if (!window.isSecureContext || !("serviceWorker" in navigator) || !("caches" in window)) {
+    await refreshOfflineUi();
+    return;
+  }
   const btn = el("offlineBtn");
   const label = el("offlineLabel");
-  const urls = storyUrls();
+  const studySave = state.studyOpen;
+  const urls = studySave ? studyOfflineUrls() : storyUrls();
   if (!urls.length) return;
   // Each fetch passes through the service worker, which stores the response,
   // so warming the deck is just reading every file once.
@@ -1964,7 +2265,7 @@ async function saveOffline() {
   await refreshOfflineUi();
   toast(
     label.textContent === "✓ Offline"
-      ? "Stories saved for offline"
+      ? (studySave ? "Study path saved for offline" : "Stories saved for offline")
       : "Saved what the network allowed — retry while online"
   );
 }
@@ -2001,8 +2302,23 @@ function wirePwa() {
   });
 
   // A new shell version downloads in the background; the reader keeps the old
-  // one until reload, so this only announces.
+  // one until the new worker takes control. Reload once on that handoff so a
+  // stale tab cannot keep rendering an older local catalog indefinitely.
   if ("serviceWorker" in navigator) {
+    let hadController = Boolean(navigator.serviceWorker.controller);
+    let reloadingForControllerChange = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!hadController) {
+        hadController = true;
+        return;
+      }
+      // The worker refreshes manifest-driven library/study routes itself,
+      // including clients still running an older app shell.
+      if (location.hash === "#/certifications/gallery" || location.hash.startsWith("#/studies/")) return;
+      if (reloadingForControllerChange) return;
+      reloadingForControllerChange = true;
+      location.reload();
+    });
     navigator.serviceWorker
       .getRegistration()
       .then((reg) => {
@@ -2012,7 +2328,7 @@ function wirePwa() {
           if (!worker) return;
           worker.addEventListener("statechange", () => {
             if (worker.state === "installed" && navigator.serviceWorker.controller) {
-              toast("New version downloaded — reload for the latest");
+              toast("New version downloaded — updating this page");
             }
           });
         });
@@ -2030,6 +2346,11 @@ const cardsInView = () => visibleQuestions().filter((q) => q.card);
 const cardList = () => state.attempt.questions.filter((q) => q.card);
 
 function openDeck(n, list) {
+  if (state.studyOpen) return openStudyDeck();
+  if (state.galleryOpen || !state.attempt) {
+    toast("Escolha uma trilha ou certificação para abrir seus Stories.");
+    return;
+  }
   const items = (list || cardsInView()).filter((q) => q.card);
   const pool = items.length ? items : cardList();
   if (!pool.length) {
@@ -2060,19 +2381,106 @@ function openDeck(n, list) {
     }
   }
 
+  state.deck.kind = "attempt";
+  state.deck.returnFocus = document.activeElement;
   state.deck.open = true;
   state.deck.list = pool.map((q) => q.n);
   el("deck").hidden = false;
   document.body.style.overflow = "hidden";
+  el("deckReadBtn").hidden = false;
+  el("deckClose").focus();
   const i = Math.max(0, state.deck.list.indexOf(start));
   showDeckSlide(i, slide);
   if (n == null && slide > 0) toast(`Continuing at Q${start} — screen ${slide + 1}/${CARD_SECTIONS.length}`);
 }
 
 function closeDeck() {
+  const refreshStudy = state.deck.kind === "study" && state.deck.progressChanged && state.studyOpen;
   state.deck.open = false;
+  state.deck.renderToken = (state.deck.renderToken || 0) + 1;
   el("deck").hidden = true;
   document.body.style.overflow = "";
+  state.deck.returnFocus?.focus();
+  state.deck.progressChanged = false;
+  if (refreshStudy) openStudyPath(state.activeStudy.id, { push: false });
+}
+
+async function openStudyDeck() {
+  const route = /^#\/studies\/([a-z0-9-]+)(?:\/([a-z0-9-]+))?/.exec(location.hash);
+  if (!route) return;
+  const context = location.hash;
+  try {
+    const loaded = await loadStudy(route[1]);
+    if (!state.studyOpen || location.hash !== context) return;
+    if (!loaded) throw new Error("Study unavailable");
+    const { study, base } = loaded;
+    const domainId = route[2] || null;
+    const items = study.modules.flatMap((module) => module.lessons
+      .filter((lesson) => lesson.type === "story" && (!domainId || studyLessonDomains(module, lesson).includes(domainId)))
+      .map((lesson) => ({
+        key: StudyPathProgress.lessonKey(module.id, lesson.id),
+        moduleId: module.id, lessonId: lesson.id,
+        title: lesson.title, card: safeStudyUrl(base, lesson.path),
+      }))).filter((item) => item.card);
+    if (!items.length) {
+      toast("Nenhum Story disponível neste domínio da trilha.");
+      return;
+    }
+    state.deck = { ...state.deck, kind: "study", open: true, studyId: study.id,
+      items, list: items.map((item) => item.key), n: items[0].key, slide: 0,
+      progressChanged: false, returnFocus: document.activeElement };
+    el("deck").hidden = false;
+    document.body.style.overflow = "hidden";
+    el("deckReadBtn").hidden = false;
+    el("deckClose").focus();
+    showStudyDeckSlide(0, 0);
+  } catch {
+    toast("Não foi possível carregar os Stories desta trilha.");
+  }
+}
+
+function paintStudyStoryCompletion(item) {
+  const complete = StudyPathProgress.isComplete(localStorage, state.deck.studyId, item.moduleId, item.lessonId);
+  const button = el("deckReadBtn");
+  button.textContent = complete ? "✓" : "○";
+  button.setAttribute("aria-pressed", String(complete));
+  button.setAttribute("aria-label", complete ? "Desmarcar conclusão da lição" : "Marcar lição como concluída");
+  button.title = button.getAttribute("aria-label");
+}
+
+async function showStudyDeckSlide(i, slide) {
+  const items = state.deck.items;
+  if (!items?.length) return;
+  if (slide >= 4) { i++; slide = 0; }
+  if (slide < 0) { i--; slide = 3; }
+  if (i < 0) return;
+  if (i >= items.length) return closeDeck();
+  const item = items[i];
+  state.deck.n = item.key;
+  state.deck.slide = slide;
+  const token = state.deck.renderToken = (state.deck.renderToken || 0) + 1;
+  el("deckQ").textContent = `Story ${i + 1}`;
+  el("deckTopic").textContent = item.title;
+  el("deckSlide").textContent = `${slide + 1}/4`;
+  el("deckCount").textContent = `story ${i + 1} of ${items.length}`;
+  el("deckPrev").disabled = i === 0 && slide === 0;
+  el("deckNext").textContent = i === items.length - 1 && slide === 3 ? "✓" : "›";
+  paintStudyStoryCompletion(item);
+  el("deckScroll").scrollTop = 0;
+  el("deckBody").innerHTML = `<p class="panel__hint">Loading…</p>`;
+  try {
+    const card = await loadCard(item);
+    if (!state.deck.open || state.deck.kind !== "study" || token !== state.deck.renderToken) return;
+    el("deckBars").innerHTML = card.screens.map((screen, k) => `<i class="${k < slide ? "is-done" : k === slide ? "is-now" : ""}" title="${esc(screen.name)}"></i>`).join("");
+    const screen = card.screens[slide];
+    const meta = card.head.meta;
+    const metadata = slide === 0 ? `<div class="deck__meta">${[meta.domain, meta.task, meta.signal].filter(Boolean).map((value) => `<span>${esc(value)}</span>`).join("")}</div>` : "";
+    const base = item.card.slice(0, item.card.lastIndexOf("/") + 1);
+    el("deckBody").innerHTML = `<div class="deck__kicker"><span class="deck__step">${slide + 1}/4</span>${esc(screen.name)}</div>${metadata}${renderMarkdown(screen.body.join("\n"), base)}`;
+    wrapTables(el("deckBody"));
+  } catch {
+    if (state.deck.open && token === state.deck.renderToken) el("deckBody").innerHTML = `<p class="panel__hint">Não foi possível carregar este Story.</p>`;
+  }
 }
 
 async function showDeckSlide(i, slide) {
@@ -2098,6 +2506,7 @@ async function showDeckSlide(i, slide) {
 
   state.deck.n = n;
   state.deck.slide = slide;
+  const token = state.deck.renderToken = (state.deck.renderToken || 0) + 1;
   saveLastStory(n, slide);
   const q = cardFor(n);
   if (!q) return;
@@ -2121,6 +2530,7 @@ async function showDeckSlide(i, slide) {
   el("deckBody").innerHTML = kicker + `<p class="panel__hint">Loading…</p>`;
   try {
     const card = await loadCard(q);
+    if (!state.deck.open || state.deck.kind !== "attempt" || token !== state.deck.renderToken) return;
     const body = card.screens[slide].body.join("\n").trim();
     // A card sits in the cards/ subfolder, so relative links resolve from there.
     const cardUrl = cardPath(q);
@@ -2142,14 +2552,15 @@ async function showDeckSlide(i, slide) {
       kicker + head + (body ? renderMarkdown(body, base) : `<p class="panel__hint">This screen is empty.</p>`);
     wrapTables(el("deckBody"));
   } catch (err) {
-    el("deckBody").innerHTML = kicker + `<p class="panel__hint">Could not read the card: ${esc(err.message)}</p>`;
+    if (state.deck.open && state.deck.kind === "attempt" && token === state.deck.renderToken) el("deckBody").innerHTML = kicker + `<p class="panel__hint">Could not read the card: ${esc(err.message)}</p>`;
   }
 }
 
 const stepDeck = (delta) => {
   if (!state.deck.open) return;
   const at = Math.max(0, state.deck.list.indexOf(state.deck.n));
-  showDeckSlide(at, state.deck.slide + delta);
+  if (state.deck.kind === "study") showStudyDeckSlide(at, state.deck.slide + delta);
+  else showDeckSlide(at, state.deck.slide + delta);
 };
 
 /* Tap and swipe. A press that never moved is a tap, and which half of the card
@@ -2230,7 +2641,7 @@ async function loadAttempt(id, { push = true } = {}) {
   const examEntry = currentExamEntry();
   if (!examEntry) {
     state.exam = null; state.attempt = null;
-    if (push) location.hash = `#${state.selectedCertificationId}`;
+    if (push) location.hash = selectionHash();
     renderAll();
     return;
   }
@@ -2239,7 +2650,7 @@ async function loadAttempt(id, { push = true } = {}) {
   state.exam = await examResponse.json();
   if (!entry) {
     state.attempt = null;
-    if (push) location.hash = `#${state.selectedCertificationId}/${state.selectedExamId}`;
+    if (push) location.hash = selectionHash();
     try {
       localStorage.setItem("sb-selection", JSON.stringify({
         certificationId: state.selectedCertificationId,
@@ -2263,7 +2674,7 @@ async function loadAttempt(id, { push = true } = {}) {
   state.readMinutes.clear();
   loadRead(identity());
   loadLastStory(); // Migrate the old position key as soon as the attempt opens.
-  if (push) location.hash = `#${state.selectedCertificationId}/${state.selectedExamId}/${id}`;
+  if (push) location.hash = selectionHash();
   try {
     localStorage.setItem("sb-selection", JSON.stringify({
       certificationId: state.selectedCertificationId,
@@ -2330,6 +2741,7 @@ function wire() {
 
   el("certSelector").addEventListener("change", () => {
     state.selectedCertificationId = el("certSelector").value;
+    state.selectedDomainId = localStorage.getItem(`sb-cert-domain:${state.selectedCertificationId}`) || "";
     const cert = currentCertification();
     state.selectedExamId = cert?.exams[0]?.id || null;
     renderCatalogControls();
@@ -2353,11 +2765,29 @@ function wire() {
   });
   el("openGallery").addEventListener("click", () => openCertificationGallery());
   el("galleryBack").addEventListener("click", () => {
+    if (state.studyOpen) {
+      location.hash = "#/certifications/gallery";
+      return;
+    }
     const target = selectionHash();
     closeCertificationGallery();
     if (location.hash !== target) location.hash = target;
   });
   el("galleryContent").addEventListener("click", (event) => {
+    const openStudy = event.target.closest("[data-open-study]");
+    if (openStudy) return openStudyPath(openStudy.dataset.openStudy);
+    const complete = event.target.closest("[data-toggle-study-complete]");
+    if (complete) {
+      const [moduleId, lessonId] = complete.dataset.toggleStudyComplete.split("|");
+      if (StudyPathProgress.toggle(localStorage, state.activeStudy.id, moduleId, lessonId)) openStudyPath(state.activeStudy.id, { push: false });
+      return;
+    }
+    const review = event.target.closest("[data-toggle-study-review]");
+    if (review) {
+      const [moduleId, lessonId] = review.dataset.toggleStudyReview.split("|");
+      if (StudyPathProgress.toggleReview(localStorage, state.activeStudy.id, moduleId, lessonId)) openStudyPath(state.activeStudy.id, { push: false });
+      return;
+    }
     const restore = event.target.closest("[data-restore-cert]");
     if (restore) return restoreCertification(restore.dataset.restoreCert);
     const open = event.target.closest("[data-open-cert]");
@@ -2365,6 +2795,12 @@ function wire() {
   });
   el("certArchiveState").addEventListener("click", (event) => {
     if (event.target.closest("#restoreCurrentCert")) restoreCertification(state.selectedCertificationId);
+  });
+  el("certDomainSelector").addEventListener("change", () => {
+    state.selectedDomainId = el("certDomainSelector").value;
+    try { localStorage.setItem(`sb-cert-domain:${state.selectedCertificationId}`, state.selectedDomainId); } catch { /* domain remains selected for this session */ }
+    location.hash = selectionHash();
+    renderAll();
   });
   el("materialShelf").addEventListener("click", (event) => {
     const button = event.target.closest("[data-material]");
@@ -2462,6 +2898,14 @@ function wire() {
     renderIndex(el("indexSearch").value);
   });
   el("indexBody").addEventListener("click", (e) => {
+    const studyReport = e.target.closest("[data-study-report]");
+    if (studyReport) {
+      closeIndex();
+      if (location.hash === studyReport.getAttribute("href")) {
+        el("galleryContent").querySelector(".study-path__title")?.focus();
+      }
+      return;
+    }
     const mark = e.target.closest("[data-read-toggle]");
     if (mark) return markRead(Number(mark.dataset.readToggle), !isRead(Number(mark.dataset.readToggle)));
     const story = e.target.closest("[data-story]");
@@ -2480,7 +2924,17 @@ function wire() {
   el("deckClose").addEventListener("click", closeDeck);
   el("deckPrev").addEventListener("click", () => stepDeck(-1));
   el("deckNext").addEventListener("click", () => stepDeck(1));
-  el("deckReadBtn").addEventListener("click", () => markRead(state.deck.n, !isRead(state.deck.n)));
+  el("deckReadBtn").addEventListener("click", () => {
+    if (state.deck.kind === "study") {
+      const item = state.deck.items.find((item) => item.key === state.deck.n);
+      if (item && StudyPathProgress.toggle(localStorage, state.deck.studyId, item.moduleId, item.lessonId)) {
+        state.deck.progressChanged = true;
+        paintStudyStoryCompletion(item);
+      }
+      return;
+    }
+    markRead(state.deck.n, !isRead(state.deck.n));
+  });
   wireDeckGestures();
   wirePwa();
 
@@ -2524,11 +2978,16 @@ function wire() {
   el('reportTopicSearch').addEventListener('input', filterReportTopics);
   reportMobile.addEventListener('change', placeReviewTopics);
   window.addEventListener("hashchange", () => {
+    const studyRoute = /^#\/studies\/([a-z0-9-]+)(?:\/([a-z0-9-]+))?(?:\/([a-z0-9-]+))?(?:\/([a-z0-9-]+))?$/.exec(location.hash);
+    if (studyRoute) {
+      openStudyPath(studyRoute[1], { push: false });
+      return;
+    }
     if (location.hash === "#/certifications/gallery") {
       openCertificationGallery({ push: false });
       return;
     }
-    if (state.galleryOpen) closeCertificationGallery();
+    if (state.galleryOpen || state.studyOpen) closeCertificationGallery();
     handleReportRoute();
   });
 
@@ -2634,11 +3093,22 @@ async function boot() {
   }
   state.certificationStatus = CertificationStatus.read(localStorage);
   const certifications = state.manifest.certifications || [];
+  const [initialPath, initialQuery = ""] = location.hash.split("?");
+  state.selectedDomainId = new URLSearchParams(initialQuery).get("domain") || "";
+  const studyRoute = /^#\/studies\/([a-z0-9-]+)(?:\/([a-z0-9-]+))?(?:\/([a-z0-9-]+))?(?:\/([a-z0-9-]+))?$/.exec(location.hash);
+  if (studyRoute) {
+    openStudyPath(studyRoute[1], { push: false });
+    return;
+  }
   if (location.hash === "#/certifications/gallery") {
     openCertificationGallery({ push: location.hash !== "#/certifications/gallery" });
     return;
   }
   if (!certifications.length) {
+    if (state.manifest.studies?.length) {
+      openCertificationGallery({ push: location.hash !== "#/certifications/gallery" });
+      return;
+    }
     el("list").innerHTML = `<div class="empty">No certifications in <code>data/index.json</code> yet.</div>`;
     return;
   }
@@ -2659,7 +3129,7 @@ async function boot() {
     openCertificationGallery();
     return;
   }
-  const hash = location.hash.slice(1).split("/");
+  const hash = initialPath.slice(1).split("/");
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem("sb-selection") || "null"); } catch { /* ignore invalid local selection */ }
   const candidates = [

@@ -3175,3 +3175,55 @@ details.panel > summary.panel__head {
   .reportview__reading label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .reportview__reading .input { width: 104px; padding-inline: 6px; font-size: 12px; }
 }
+
+/* Domain-led study paths. Cards keep the same tactile surfaces across themes. */
+.domain-help { display:block; max-width:24rem; color:var(--id-ink-secondary); font-size:.78rem; line-height:1.4; }
+.study-path { max-width:1120px; margin:0 auto; padding:0 24px 64px; }
+.study-path__top { display:flex; justify-content:space-between; align-items:center; gap:16px; color:var(--id-ink-secondary); font-size:.9rem; }
+.study-path__top a,.study-crumb a { color:var(--id-link); }
+.study-path__title { margin:20px 0; font-size:clamp(1.8rem,4vw,3rem); }
+.study-intro { max-width:60ch; color:var(--id-ink-secondary); }
+.domain-nav { display:flex; gap:10px; overflow-x:auto; padding:10px 2px 18px; margin:0 0 18px; }
+.domain-pill { flex:0 0 auto; padding:10px 15px; min-height:44px; border:1px solid var(--id-border); border-radius:999px; color:var(--id-ink-primary); text-decoration:none; background:var(--id-panel); }
+.domain-pill.is-current { border-color:var(--id-signal); box-shadow:inset 0 -3px var(--id-signal); font-weight:700; }
+.domain-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+.domain-card,.study-module { display:block; padding:22px; border:1px solid var(--id-border); border-radius:var(--id-radius-module); background:var(--id-gradient-plate); box-shadow:var(--id-shadow-plate); color:var(--id-ink-primary); }
+.domain-card { text-decoration:none; min-height:180px; }
+.domain-card:hover,.study-module a:hover { outline:2px solid var(--id-focus); }
+.domain-card h2 { margin:12px 0 8px; }
+.domain-card p { color:var(--id-ink-secondary); }
+.domain-card__count,.domain-card__progress { color:var(--id-ink-secondary); font-size:.85rem; }
+.domain-card--all { border-style:dashed; }
+.domain-heading { display:flex; justify-content:space-between; gap:20px; color:var(--id-ink-secondary); }
+.study-modules { display:grid; gap:16px; }
+.study-module__head span { color:var(--id-ink-secondary); font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; }
+.study-module h2 { margin:.4em 0 .8em; }
+.study-module ol { padding-left:1.4rem; }
+.study-module li { padding:10px 0; }
+.study-module li a { color:var(--id-link); font-weight:650; }
+.study-module li span { display:block; margin-top:4px; color:var(--id-ink-secondary); font-size:.82rem; text-transform:capitalize; }
+.study-lesson { max-width:900px; margin:0 auto; }
+.study-crumb { margin:10px 0 20px; color:var(--id-ink-secondary); }
+.study-lesson__actions { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px; }
+.study-markdown { padding:clamp(20px,4vw,48px); border:1px solid var(--id-border); border-radius:var(--id-radius-module); background:var(--id-panel); }
+.study-markdown h1 { font-size:clamp(1.6rem,4vw,2.4rem); }
+.study-markdown h2 { margin-top:1.8em; }
+.study-markdown :not(pre) > code { overflow-wrap:anywhere; }
+.study-markdown table { display:block; max-width:100%; overflow-x:auto; border-collapse:collapse; }
+.study-markdown th,.study-markdown td { padding:9px 12px; border:1px solid var(--id-border-quiet); text-align:left; vertical-align:top; }
+.study-next { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:12px; margin-top:24px; }
+.study-next > :last-child { justify-self:end; }
+@media(max-width:640px) {
+  .study-path { padding:0 14px 40px; }
+  .domain-grid { grid-template-columns:1fr; }
+  .domain-heading { display:block; }
+  .study-next { grid-template-columns:1fr 1fr; }
+  .study-next span { grid-row:1; grid-column:1/-1; text-align:center; }
+}
+
+/* Long study Reports keep section navigation inside the reading context. */
+.study-report-outline { margin: 1rem 0; }
+.study-report-outline summary { cursor: pointer; padding: .5rem 0; }
+.study-report-outline nav { display: flex; flex-wrap: wrap; gap: .5rem; padding: .5rem 0; }
+.study-report-outline .btn { max-width: 100%; text-align: left; white-space: normal; }
+.study-markdown h2[tabindex] { scroll-margin-top: 6rem; }

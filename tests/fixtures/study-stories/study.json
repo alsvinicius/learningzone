@@ -1,0 +1,14 @@
+{
+  "id": "sample-study",
+  "domains": [{"id": "backend", "name": "Backend"}, {"id": "platform", "name": "Platform"}, {"id": "empty", "name": "Empty"}],
+  "modules": [
+    {"id": "capacity", "domainId": "backend", "lessons": [
+      {"id": "first", "title": "Capacity", "type": "story", "path": "capacity/first.md"},
+      {"id": "second", "title": "Retries", "type": "story", "path": "capacity/second.md"},
+      {"id": "guide", "title": "Guide", "type": "deep-dive", "path": "capacity/guide.md"}
+    ]},
+    {"id": "runtime", "domainId": "platform", "lessons": [
+      {"id": "shared", "title": "Shared limits", "type": "story", "domainIds": ["backend"], "path": "runtime/shared.md"}
+    ]}
+  ]
+}

@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const Progress = require('../progress.js');
+const StudyPathProgress = require('../study-progress.js');
 const { cacheIndividually } = require('../cache-utils.js');
 
 class MemoryStorage {
@@ -56,4 +57,24 @@ test('offline cache keeps successful files when another file fails', async () =>
   const result = await cacheIndividually(['guide.md', 'missing.md', 'q01.md'], cache, fetcher, (url) => url);
   assert.deepEqual(result, { saved: 2, total: 3 });
   assert.deepEqual([...saved.keys()], ['guide.md', 'q01.md']);
+});
+
+test('study completion and review marks remain private and independent of exam progress', () => {
+  const storage = new MemoryStorage();
+  assert.equal(StudyPathProgress.toggle(storage, 'sample-study', 'capacity', 'deep-dive'), true);
+  assert.equal(StudyPathProgress.isComplete(storage, 'sample-study', 'capacity', 'deep-dive'), true);
+  assert.equal(StudyPathProgress.isReview(storage, 'sample-study', 'capacity', 'deep-dive'), false);
+  assert.equal(StudyPathProgress.toggleReview(storage, 'sample-study', 'capacity', 'deep-dive'), true);
+  assert.equal(StudyPathProgress.isReview(storage, 'sample-study', 'capacity', 'deep-dive'), true);
+  assert.equal(storage.getItem(StudyPathProgress.KEY).includes('sample-study'), true);
+  assert.equal(storage.getItem(Progress.readKey('sample-study')), null);
+});
+
+test('study progress ignores malformed local data and survives a write failure in memory', () => {
+  const malformed = new MemoryStorage({ [StudyPathProgress.KEY]: '{' });
+  assert.equal(StudyPathProgress.isComplete(malformed, 's', 'm', 'l'), false);
+  const blocked = new MemoryStorage();
+  blocked.setItem = () => { throw new Error('quota'); };
+  assert.equal(StudyPathProgress.toggle(blocked, 's', 'm', 'l'), false);
+  assert.equal(StudyPathProgress.isComplete(blocked, 's', 'm', 'l'), false);
 });

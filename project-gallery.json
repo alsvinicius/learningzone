@@ -3,7 +3,6 @@
   "project": {
     "name": "LearningZone",
     "familyName": "learningzone",
-    "source": "https://example.invalid/project",
     "path": "."
   },
   "services": [

@@ -1,17 +1,16 @@
 # Skill Builder
 
-**Uma aplicação de estudo local-first para organizar certificações, simulados, tentativas e materiais próprios.** O código é genérico: a distribuição começa deliberadamente sem certificações, provas, questões, relatórios ou Stories. Você adiciona apenas conteúdo que tem direito de usar.
+**Uma aplicação de estudo local-first para organizar certificações e trilhas de estudo por domínio.** O código é genérico: a distribuição começa sem certificações ou conteúdo de estudo; cada instalação pode manter seu próprio material privado.
 
 A aplicação é estática, não exige conta, não envia dados a um servidor e pode guardar o shell e os materiais selecionados para leitura offline. O progresso de leitura fica no armazenamento local do navegador. Os arquivos de conteúdo são separados do código e podem ser mantidos privados.
 
-> **Privacidade do conteúdo:** tudo em `data/`, exceto `data/index.json`, é ignorado pelo Git. O índice público inicial está vazio. Antes de publicar mudanças, execute `make check-public` e revise `git status --short` antes de publicar.
+> **Privacidade do conteúdo:** tudo em `data/`, exceto `data/index.json`, é ignorado pelo Git. O catálogo público inicial não contém certificações nem estudos. Documentação e exemplos versionados descrevem o produto genericamente e usam conteúdo sintético; metas, notas e progresso de uma pessoa ficam fora do repositório. Antes de contribuir com código, execute `make check-public` e revise `git status --short`.
 
 ## Começar
 
 Requisitos: Python 3.10 ou superior, Node.js 18 ou superior para os testes de lógica JavaScript, e um navegador moderno. A aplicação não usa dependências de runtime nem processo de build.
 
 ```bash
-git clone https://example.invalid/project.git
 cd learningzone
 make check
 make serve
@@ -29,7 +28,7 @@ Sem conteúdo local, o primeiro acesso mostra um estado vazio: o projeto não di
 
 - Navegação hierárquica: certificação → simulado → tentativa.
 - Materiais compartilhados por simulado e materiais vinculados a uma tentativa.
-- Relatórios e cartões Stories em Markdown, com vínculos opcionais por questão.
+- Relatórios e cartões Stories em Markdown, com vínculos opcionais por questão e lições Story e Reports independentes nas trilhas; Reports oferece índice por domínio, busca no texto e navegação por seções.
 - Busca, filtros e atalhos de teclado.
 - Progresso local por tentativa e retomada de Stories.
 - PWA e cache offline selecionável.
@@ -58,3 +57,5 @@ Antes de criar um commit ou release público, execute `make check-public`. O com
 O código está sob a licença MIT; consulte [LICENSE](LICENSE). A licença do código não concede direitos sobre questões, cursos, marcas, imagens ou materiais que cada pessoa adicionar localmente. A pessoa que cria ou distribui conteúdo deve verificar sua licença e origem. Consulte [Política de conteúdo](docs/diataxis/explanation/content-and-licensing.md).
 
 Cada certificação também pode ter um **Pre-Test Review**: revisão local em inglês, com prioridades e bullets por conceito, consolidando erros e dúvidas de todas as tentativas. O agente prepara e atualiza o conteúdo durante a autoria; a página verifica cobertura e atualização e permite salvar a revisão inteira offline. Consulte o [contrato](docs/diataxis/reference/pre-test-review.md) e o [procedimento](docs/diataxis/how-to/update-pre-test-review.md).
+
+Trilhas de estudo são conteúdo local opcional. Cada instalação mantém seus próprios arquivos fora do catálogo público; consulte o [contrato de conteúdo](docs/diataxis/reference/content-contract.md) e o [guia para criar uma trilha](docs/diataxis/how-to/add-study-path.md).

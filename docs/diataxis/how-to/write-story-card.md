@@ -53,3 +53,11 @@ No `exam.json` ou `attempt.json` proprietário, inclua `id`, `type: "story"`, `t
 ## Validar
 
 Execute `make check`. A validação verifica seções, ordem, corpo, H1, metadados, código de Domain e Task, a declaração das duas respostas no ecrã `Topic`, os itens de lista da secção de conceitos e o arquivo. Depois, abra Stories e confira o destino da questão.
+
+## Story de aprendizagem em uma trilha
+
+Para ensinar um conceito sem relacioná-lo a uma tentativa, crie uma lição `type: "story"` em `study.json`, com arquivo sob a trilha. Declare `**Story mode**: learning`, `Domain`, `Task` e `Signal`. Use `## Topic`, `## Where the initial model breaks`, `## A more complete model` e `## Concepts to nail it next time`, nesta ordem. Em Topic, apresente `**Initial model:**` e `**Improved model:**` como modelos didáticos, nunca como respostas atribuídas ao aluno. Os dois ecrãs centrais devem explicar os limites da intuição e desenvolver mecanismos, condições e trade-offs. Não há limite de Stories por domínio; prefira cenários distintos que ensinem algo novo. O manifesto não usa `questionNumber` nem vínculos de questão.
+
+Valide pelo caminho privado autorizado com `python3 tools/check.py --index .local/private-data/index.personal.json --quiet`. A validação reconhece o formato `learning` sem mudar a estrutura histórica dos Stories de certificação.
+
+Para oferecer um percurso conceitual completo, inventarie os conceitos dos materiais extensos e decomponha-os em cartões autônomos. Relacione cada material/seção aos Stories em uma matriz privada, registre lacunas e revise os mecanismos, condições e limites. Inclua perguntas respondidas para o aluno testar a compreensão. Siga o [critério de cobertura](../reference/story-card-format.md#cobertura-conceitual-de-uma-trilha); amplie a quantidade quando houver assunto descoberto, em vez de usar uma cota por domínio.

@@ -20,6 +20,12 @@ STORY_SECTIONS = (
     "Why the right answer was different",
     "Concepts to nail it next time",
 )
+LEARNING_STORY_SECTIONS = (
+    "Topic",
+    "Where the initial model breaks",
+    "A more complete model",
+    "Concepts to nail it next time",
+)
 
 
 class ContentError(ValueError):
@@ -150,7 +156,7 @@ def _validate_story(path: Path, question_number=None):
 
 
 def _validate_attempt(attempt_path: Path, certification_id: str, exam_id: str, attempt_id: str,
-                      exam_materials: dict):
+                      exam_materials: dict, certification_domains: set[str] | None = None):
     attempt = _object(_read_json(attempt_path), attempt_path, "tentativa")
     if attempt.get("schemaVersion") != 1:
         raise ContentError(f"{attempt_path}: schemaVersion deve ser 1")
@@ -161,6 +167,8 @@ def _validate_attempt(attempt_path: Path, certification_id: str, exam_id: str, a
     for key in ("score", "totals", "window"):
         _object(attempt.get(key), attempt_path, key)
     attempt_materials = _materials(attempt.get("materials"), attempt_path, attempt_path.parent, "materials")
+    if certification_domains is not None:
+        _validate_material_domains(attempt_materials, certification_domains, attempt_path)
     questions = _array(attempt.get("questions"), attempt_path, "questions")
     qnums = []
     for i, qraw in enumerate(questions):
@@ -169,6 +177,9 @@ def _validate_attempt(attempt_path: Path, certification_id: str, exam_id: str, a
         if not isinstance(n, int) or isinstance(n, bool) or n < 1:
             raise ContentError(f"{attempt_path}: questions[{i}].n deve ser inteiro positivo")
         qnums.append(n)
+        domain_id = qraw.get("domainId")
+        if domain_id is not None and certification_domains is not None and domain_id not in certification_domains:
+            raise ContentError(f"{attempt_path}: questions[{i}].domainId referencia domínio inexistente")
         if 'learnerNotes' in q and not isinstance(q['learnerNotes'], str):
             raise ContentError('learnerNotes deve ser texto')
         if 'reviewRequested' in q and not isinstance(q['reviewRequested'], bool):
@@ -205,12 +216,14 @@ def validate_catalog(data_dir: str | Path, *, index_path: str | Path | None = No
     if index.get("schemaVersion") != 1:
         raise ContentError(f"{index_path}: schemaVersion deve ser 1")
     certifications = _array(index.get("certifications"), index_path, "certifications")
+    studies = _array(index.get("studies", []), index_path, "studies")
     cert_ids = []
     for ci, craw in enumerate(certifications):
         cert = _object(craw, index_path, f"certifications[{ci}]")
         cid = _id(cert.get("id"), index_path, f"certifications[{ci}].id")
         cert_ids.append(cid)
         _text(cert.get("name"), index_path, f"certifications[{ci}].name")
+        certification_domains = _validate_domains(cert.get("domains", []), index_path, f"certifications[{ci}].domains")
         exams = _array(cert.get("exams"), index_path, f"certifications[{ci}].exams")
         exam_ids = []
         for ei, eraw in enumerate(exams):
@@ -225,6 +238,7 @@ def validate_catalog(data_dir: str | Path, *, index_path: str | Path | None = No
                 raise ContentError(f"{exam_path}: schemaVersion/id não correspondem ao contrato e ao índice")
             _text(exam.get("title"), exam_path, "title")
             exam_materials = _materials(exam.get("materials"), exam_path, exam_path.parent, "materials")
+            _validate_material_domains(exam_materials, certification_domains, exam_path)
             attempts = _array(entry.get("attempts"), index_path, f"{eid}.attempts")
             attempt_ids = []
             for ai, araw in enumerate(attempts):
@@ -236,7 +250,7 @@ def validate_catalog(data_dir: str | Path, *, index_path: str | Path | None = No
                         or attempt_path.parent.parent.parent.name != eid
                         or attempt_path.parent.parent.parent.parent.name != cid):
                     raise ContentError(f"{index_path}: attempt.path {aentry.get('path')!r} deve estar em {cid}/{eid}/attempts/{aid}/")
-                _validate_attempt(attempt_path, cid, eid, aid, exam_materials)
+                _validate_attempt(attempt_path, cid, eid, aid, exam_materials, certification_domains)
             _unique(attempt_ids, index_path, f"IDs de tentativa em {cid}/{eid}")
         _unique(exam_ids, index_path, f"IDs de simulado em {cid}")
         if cert.get('preTestReview') is not None:
@@ -249,7 +263,129 @@ def validate_catalog(data_dir: str | Path, *, index_path: str | Path | None = No
             except (ReviewError, ValueError, OSError, KeyError, TypeError) as exc:
                 raise ContentError('Pre-Test Review inválido, incompleto ou desatualizado') from exc
     _unique(cert_ids, index_path, "ID de certificação")
-    return index
+    study_ids = []
+    for si, raw in enumerate(studies):
+        entry = _object(raw, index_path, f"studies[{si}]")
+        sid = _id(entry.get("id"), index_path, f"studies[{si}].id")
+        study_ids.append(sid)
+        study_path = _index_path(root, entry.get("path"), index_path, "study.path", "study.json")
+        if study_path.parent.name != sid:
+            raise ContentError(f"{index_path}: study.path deve estar em {sid}/")
+        study = _object(_read_json(study_path), study_path, "estudo")
+        if study.get("schemaVersion") != 1 or study.get("id") != sid:
+            raise ContentError(f"{study_path}: schemaVersion/id não correspondem ao contrato e ao índice")
+        _text(study.get("title"), study_path, "title")
+        domains = _validate_domains(study.get("domains"), study_path, "domains")
+        modules = _array(study.get("modules"), study_path, "modules")
+        module_ids = []
+        for mi, module_raw in enumerate(modules):
+            module = _object(module_raw, study_path, f"modules[{mi}]")
+            mid = _id(module.get("id"), study_path, f"modules[{mi}].id")
+            module_ids.append(mid)
+            _text(module.get("title"), study_path, f"modules[{mi}].title")
+            _validate_domain_ref(module.get("domainId"), domains, study_path, f"modules[{mi}].domainId")
+            lessons = _array(module.get("lessons"), study_path, f"modules[{mi}].lessons")
+            lesson_ids = []
+            for li, lesson_raw in enumerate(lessons):
+                lesson = _object(lesson_raw, study_path, f"modules[{mi}].lessons[{li}]")
+                lid = _id(lesson.get("id"), study_path, f"modules[{mi}].lessons[{li}].id")
+                lesson_ids.append(lid)
+                _text(lesson.get("title"), study_path, f"modules[{mi}].lessons[{li}].title")
+                lesson_type = lesson.get("type")
+                if lesson_type not in ("deep-dive", "decision-guide", "case", "challenge", "story", "report"):
+                    raise ContentError(f"{study_path}: lesson.type inválido em {lid}")
+                associations = lesson.get("domainIds", [module.get("domainId")])
+                if not isinstance(associations, list) or not associations:
+                    raise ContentError(f"{study_path}: {lid}.domainIds deve ser uma lista não vazia")
+                for domain_id in associations:
+                    _validate_domain_ref(domain_id, domains, study_path, f"{lid}.domainIds")
+                _unique(associations, study_path, f"domainIds em {lid}")
+                lesson_file = _safe_file(study_path.parent, lesson.get("path"), study_path, f"{lid}.path")
+                if lesson_type == "story":
+                    _validate_study_story(lesson_file, domains)
+            _unique(lesson_ids, study_path, f"IDs de lição em {mid}")
+            if not lessons:
+                raise ContentError(f"{study_path}: módulo {mid} precisa ter ao menos uma lição")
+        _unique(module_ids, study_path, "IDs de módulo")
+        if not modules:
+            raise ContentError(f"{study_path}: o estudo precisa ter ao menos um módulo")
+    _unique(study_ids, index_path, "ID de estudo")
+    return {**index, "certifications": certifications, "studies": studies}
+
+
+def _validate_domains(value, path: Path, label: str) -> set[str]:
+    domains = _array(value, path, label)
+    ids = []
+    for i, raw in enumerate(domains):
+        domain = _object(raw, path, f"{label}[{i}]")
+        did = _id(domain.get("id"), path, f"{label}[{i}].id")
+        ids.append(did)
+        _text(domain.get("name"), path, f"{label}[{i}].name")
+        if "description" in domain:
+            _text(domain["description"], path, f"{label}[{i}].description")
+    _unique(ids, path, f"IDs em {label}")
+    return set(ids)
+
+
+def _validate_study_story(path: Path, domains: set[str]):
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ContentError(f"{path}: não foi possível ler Story de estudo: {exc}") from exc
+    learning_mode = re.search(r"^\s*[-*]\s+\*\*Story mode\*\*\s*:\s*learning\s*$", text, re.MULTILINE | re.IGNORECASE)
+    expected_sections = LEARNING_STORY_SECTIONS if learning_mode else STORY_SECTIONS
+    headings = re.findall(r"^##\s+(.+?)\s*$", text, re.MULTILINE)
+    if tuple(headings) != expected_sections:
+        raise ContentError(f"{path}: seções Story devem ser {list(expected_sections)!r}; encontradas {headings!r}")
+    parts = re.split(r"^##\s+.+?\s*$", text, flags=re.MULTILINE)[1:]
+    if not all(part.strip() for part in parts):
+        raise ContentError(f"{path}: seção Story vazia")
+    lines = text.splitlines()
+    if not lines or not re.match(r"^#\s+Story\s+[—–-]\s+.+", lines[0]):
+        raise ContentError(f"{path}: Story de estudo deve começar com '# Story — título'")
+    metadata = {}
+    for label in ("Domain", "Task", "Signal"):
+        match = re.search(r"^\s*[-*]\s+\*\*%s\*\*\s*:\s*(.+)$" % label, text, re.MULTILINE)
+        if not match or not match.group(1).strip():
+            raise ContentError(f"{path}: metadado Story ausente ou vazio: {label}")
+        metadata[label] = match.group(1).strip()
+    domain_id = metadata["Domain"].split("—", 1)[0].split("–", 1)[0].split("-", 1)[0].strip()
+    if domain_id not in domains:
+        raise ContentError(f"{path}: Domain de Story de estudo não corresponde a um domínio declarado")
+    topic = parts[0]
+    # Study Stories can teach a new mental model without pretending that a
+    # learner answered a certification question. Keep legacy answer labels
+    # valid, while allowing an explicit learning mode with an initial and a
+    # more complete model instead.
+    if learning_mode:
+        for label in ("Initial model", "Improved model"):
+            if not re.search(r"\*\*%s\b" % label, topic):
+                raise ContentError(f"{path}: Topic de Story learning deve declarar '**{label}**'")
+    else:
+        for label in ("Your answer", "Correct answer"):
+            if not re.search(r"\*\*%s\b" % label, topic):
+                raise ContentError(f"{path}: Topic deve declarar '**{label}**' ou declarar Story mode: learning")
+    concepts = parts[-1]
+    concept_lines = [line.strip() for line in concepts.splitlines() if line.strip()]
+    if not any(re.match(r"[-*]\s+\S", line) for line in concept_lines):
+        raise ContentError(f"{path}: Concepts to nail it next time precisa de itens de lista")
+    if not concept_lines or not re.match(r"[-*]\s+The sentence to keep:", concept_lines[-1]):
+        raise ContentError(f"{path}: Concepts to nail it next time deve terminar com 'The sentence to keep:'")
+
+
+def _validate_domain_ref(value, domains: set[str], path: Path, label: str):
+    if not isinstance(value, str) or value not in domains:
+        raise ContentError(f"{path}: {label} referencia domínio inexistente")
+
+
+def _validate_material_domains(materials: dict, domains: set[str], path: Path):
+    for material in materials.values():
+        associations = material.get("domainIds", [])
+        if not isinstance(associations, list):
+            raise ContentError(f"{path}: domainIds de material deve ser uma lista")
+        for domain_id in associations:
+            _validate_domain_ref(domain_id, domains, path, "material.domainIds")
+        _unique(associations, path, "domainIds de material")
 
 
 def _index_path(root: Path, relative: str, source: Path, label: str, filename: str) -> Path:
